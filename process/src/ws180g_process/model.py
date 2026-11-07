@@ -24,8 +24,9 @@ class Field(Strict):
 
     `margin` is a ratio >= 1 between the value and the requirement it covers; `margin_reason`
     explains a margin that differs from the report's computed requirement; `margin_achieved` is
-    the author's figure, checked by the report; `composed_of` lists the full dotted paths of
-    the fields this one is built from.
+    the author's figure, checked by the report (for a `range` field `margin_achieved_min` and
+    `margin_achieved_max` hold the figures of its two bounds instead); `composed_of` lists the
+    full dotted paths of the fields this one is built from.
     """
 
     value: Decimal | None = None
@@ -36,9 +37,71 @@ class Field(Strict):
     margin: Decimal | None = PydanticField(default=None, ge=1)
     margin_reason: str = ""
     margin_achieved: Decimal | None = None
+    margin_achieved_min: Decimal | None = None
+    margin_achieved_max: Decimal | None = None
     composed_of: list[str] = []
     source: str | None = None
     note: str = ""
+
+    @model_validator(mode="after")
+    def _range_unit(self) -> "Field":
+        if self.range is not None and self.range.unit != self.unit:
+            raise ValueError(f"range unit {self.range.unit} differs from unit {self.unit}")
+        if self.range is None and (self.margin_achieved_min, self.margin_achieved_max) != (
+                None, None):
+            raise ValueError("margin_achieved_min and _max belong to a range field")
+        return self
+
+
+RuleKind = Literal[
+    "min-width", "gate-length", "min-space", "min-enclosure", "min-extension", "min-area",
+    "exact-size", "max-distance", "topology", "generation",
+]
+Engine = Literal["klayout", "magic"]
+
+
+class RuleField(Strict):
+    """One rule of the rule set, `rules.<id>` in `rules.toml`.
+
+    `layers` are layer expressions (a layer name or alias combined with `|`, `&`, `-`,
+    `.sized(<field path>)`, `.unrelated(<expr>)`). `value` and `unit` are unset exactly for a
+    `topology` rule, which names its hand-written `fixture` instead. `module` names the
+    optional module a rule belongs to. `composed_of` lists evidence ids and full dotted field
+    paths the value is built from (the margined part plus the fields named); `implied_by` the
+    rule whose fixture already proves this one; `edges = "sides"` restricts the checked inner
+    edges to those of `edge_layer`; `condition` limits where the rule applies; `engines` the
+    DRC engines that check it (empty: proven by construction, no deck rule).
+    """
+
+    kind: RuleKind
+    layers: list[str]
+    value: Decimal | None = None
+    unit: Literal["um", "um2"] | None = None
+    variant: str
+    module: str | None = None
+    provenance: Provenance
+    evidence: list[str] = []
+    margin: Decimal | None = PydanticField(default=None, ge=1)
+    margin_reason: str = ""
+    margin_achieved: Decimal | None = None
+    composed_of: list[str] = []
+    implied_by: str | None = None
+    edges: Literal["sides"] | None = None
+    edge_layer: str | None = None
+    engines: list[Engine] = ["klayout", "magic"]
+    condition: str | None = None
+    fixture: str | None = None
+    note: str = ""
+
+    @model_validator(mode="after")
+    def _consistent(self) -> "RuleField":
+        if (self.kind == "topology") != (self.value is None):
+            raise ValueError("a topology rule has no value; every other rule has one")
+        if (self.value is None) != (self.unit is None):
+            raise ValueError("set unit exactly when value is set")
+        if (self.edges is None) != (self.edge_layer is None):
+            raise ValueError("set edge_layer exactly when edges is set")
+        return self
 
 
 class Variant(Strict):
@@ -93,20 +156,25 @@ class Mask(Strict):
 
 
 # `Oxide.lmin_*` and `Litho.min_*` name process fields by full dotted path ("rules.m1.w") so
-# each number lives once; Task 7 adds the rules and the check that these paths resolve.
+# each number lives once; the loader checks that these paths resolve.
 
 
 class Oxide(Strict):
-    thickness: Range
-    vt_n: Range
-    vt_p: Range
+    """A gate oxide; `thickness`, `vt_n` and `vt_p` are fields with a `range`."""
+
+    thickness: Field
+    vt_n: Field
+    vt_p: Field
     lmin_n: str
     lmin_p: str
 
 
 class MetalLayer(Strict):
-    thickness: Range | None = None
-    sheet_rho: Range | None = None
+    """A metal; `thickness` and `sheet_rho` are fields with a `range`, absent when unknown."""
+
+    thickness: Field | None = None
+    sheet_rho: Field | None = None
+    note: str = ""
 
 
 class Dielectric(Strict):
@@ -155,5 +223,5 @@ class Process(Strict):
     layers: dict[str, Layer]
     masks: list[Mask]
     stack: Stack
-    # Placeholder: Task 7 replaces `rules` with `dict[str, RuleField]` and adds `aliases`.
-    rules: dict = {}
+    aliases: dict[str, str]
+    rules: dict[str, RuleField]

@@ -49,14 +49,25 @@ def test_oxides_and_metals_wait_for_task_7(process):
     assert process.stack.oxides == {} and process.stack.metals == {}
 
 
-def test_oxide_and_metal_accept_task_7_content():
+def test_oxide_and_metal_accept_range_fields():
     from ws180g_process.model import MetalLayer, Oxide
 
-    r = {"min": 1, "nominal": 2, "max": 3, "unit": "nm"}
-    oxide = Oxide(thickness=r, vt_n=r, vt_p=r, lmin_n="rules.po.l.n", lmin_p="rules.po.l.p")
+    f = {"range": {"min": 1, "nominal": 2, "max": 3, "unit": "nm"}, "unit": "nm",
+         "provenance": "public-source", "margin_achieved_min": 1.2, "margin_achieved_max": 1.2}
+    oxide = Oxide(thickness=f, vt_n=f, vt_p=f, lmin_n="rules.po.l.n", lmin_p="rules.po.l.p")
     assert oxide.lmin_p == "rules.po.l.p"
-    assert MetalLayer(thickness=r, sheet_rho=None).thickness.nominal == 2
+    assert MetalLayer(thickness=f, sheet_rho=None).thickness.range.nominal == 2
     assert MetalLayer().sheet_rho is None
+
+
+def test_a_range_field_unit_must_match_its_range():
+    from ws180g_process.model import Field
+
+    with pytest.raises(ValueError, match="unit"):
+        Field(range={"min": 1, "nominal": 2, "max": 3, "unit": "nm"}, unit="um",
+              provenance="public-source")
+    with pytest.raises(ValueError, match="range"):
+        Field(value=1, unit="um", provenance="chosen", margin_achieved_min=1.2)
 
 
 def _lines(data_copy) -> list[str]:

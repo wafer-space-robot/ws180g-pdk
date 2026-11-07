@@ -30,6 +30,7 @@ KEY_FILE = {
     "layers": "layers.toml",
     "masks": "masks.toml",
     "stack": "stack.toml",
+    "aliases": "rules.toml",
     "rules": "rules.toml",
 }
 FILES = list(dict.fromkeys(KEY_FILE.values()))

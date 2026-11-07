@@ -239,3 +239,17 @@ def test_cli(tmp_path, capsys):
     assert main(["--out", str(tmp_path)]) == 0
     assert (tmp_path / "nw.w" / "pass_min.gds").is_file()
     assert "fixtures" in capsys.readouterr().out
+
+
+def test_expected_markers(fixtures):
+    """Each forced exception names a real fail fixture and still includes its own rule."""
+    from ws180g_rules.fixtures import EXPECTED_MARKERS
+
+    fails = {(f.rule_id, f.name) for f in fixtures if f.expect == "fail"}
+    assert set(EXPECTED_MARKERS) <= fails
+    for (rid, _), markers in EXPECTED_MARKERS.items():
+        assert markers.get(rid, 0) >= 1
+    by_key = {(f.rule_id, f.expect, f.name): f for f in fixtures}
+    assert by_key[("nw.w", "pass", "min")].markers() == {}
+    assert by_key[("nw.w", "fail", "min_minus_grid")].markers() == {"nw.w": 1}
+    assert by_key[("grid", "fail", "grid")].markers() == {"grid": 2}

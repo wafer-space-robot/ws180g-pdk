@@ -60,6 +60,23 @@ METAL_MERGE = 2200
 V4_SHIFT = 350
 _LENGTH_CONDITION = re.compile(r"^\s*length\s*>\s*(\d+(?:\.\d+)?)\s*$")
 
+#: The fail fixtures whose markers cannot be its own rule exactly once, with the markers the
+#: KLayout deck gives (self-check of Task 14), and why the geometry forces them:
+#: - a contact straddling the df or po edge has its outside part on field: co.in too (the
+#:   outside part on po or df instead would make a gate or a po.s.df violation);
+#: - poly enclosing a contact at under 0.24 um from df must reach the df there, so that df
+#:   edge is a gate edge: co.s.gate (also 0.24 um) fires with co.po.s.df;
+#: - a rotated cut is neither a square box nor of the exact bounding box: co.size too;
+#: - an off-grid coordinate is shared by the two ends of an orthogonal edge, and a 45 degree
+#:   edge cannot bring both coordinates back on the grid: two grid markers.
+EXPECTED_MARKERS: dict[tuple[str, str], dict[str, int]] = {
+    ("df.e.co", "straddle"): {"df.e.co": 1, "co.in": 1},
+    ("po.e.co", "straddle"): {"po.e.co": 1, "co.in": 1},
+    ("co.po.s.df", "min_minus_grid"): {"co.po.s.df": 1, "co.s.gate": 1},
+    ("cut.ortho", "cut_ortho"): {"cut.ortho": 1, "co.size": 1},
+    ("grid", "grid"): {"grid": 2},
+}
+
 
 @dataclass(frozen=True)
 class Fixture:
@@ -69,6 +86,13 @@ class Fixture:
     name: str
     path: Path
     expect: Literal["pass", "fail"]
+
+    def markers(self) -> dict[str, int]:
+        """The markers the deck must report: none for a pass fixture, one of its own rule
+        for a fail fixture, or the forced set of `EXPECTED_MARKERS`."""
+        if self.expect == "pass":
+            return {}
+        return EXPECTED_MARKERS.get((self.rule_id, self.name), {self.rule_id: 1})
 
 
 def to_dbu(value: Decimal) -> int:

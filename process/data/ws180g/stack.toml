@@ -1,11 +1,124 @@
 # SPDX-License-Identifier: Apache-2.0
-# The process stack. Task 3 writes the schema tables and placeholders; Task 7 fills
-# `oxides` and `metals` and the evidence-bearing ranges once the evidence exists.
-# Fields absent here (a thickness, a doping, a registration value) are unknown, not zero.
+# The process stack. Fields absent here (a thickness, a doping, a registration value) are
+# unknown, not zero. A range field covers the cited public values with a margin (spec 3.2,
+# 3.6): `min` = smallest cited value / margin rounded down, `max` = largest cited value x
+# margin rounded up, to the unit's precision (nm 0.01, um the 0.005 grid, V 0.001,
+# ohm/sq 0.0001); `margin_achieved_min` = smallest cited value / min and
+# `margin_achieved_max` = max / largest cited value, rounded half-up to 0.001.
 
-[stack.oxides]
+# The 5 V gate oxide, the only oxide of ws180g005. Its minimum gate lengths are the rules.
+[stack.oxides.5v0]
+lmin_n = "rules.po.l.n"
+lmin_p = "rules.po.l.p"
 
-[stack.metals]
+[stack.oxides.5v0.thickness]
+range = { min = 12.66, nominal = 15.6, max = 19.2, unit = "nm" }
+unit = "nm"
+provenance = "derived"
+evidence = ["gf180mcu-models/nfet_06v0/toxe", "gf180mcu-models/nfet_06v0/toxp"]
+margin = 1.2
+margin_reason = "two card parameters (TOXE, TOXP) bound the range from both sides; single-source 1.5 would put the minimum below any published 5 V oxide"
+margin_achieved_min = 1.201
+margin_achieved_max = 1.200
+note = "GF180MCU 6 V card: electrical TOXE 15.2 nm, physical TOXP 16.0 nm; min 15.2 / 1.2 = 12.667, down to 12.66; nominal the midpoint 15.6; max 16.0 x 1.2 = 19.2"
+
+[stack.oxides.5v0.vt_n]
+range = { min = 0.560, nominal = 0.722, max = 0.924, unit = "V" }
+unit = "V"
+provenance = "derived"
+evidence = ["gf180mcu-models/nfet_06v0/vth0", "xc018/ne5/vt"]
+margin = 1.2
+margin_achieved_min = 1.202
+margin_achieved_max = 1.200
+note = "long-channel NMOS threshold: GF180MCU card vth0 0.67314 V, X-FAB XC018 ne5 0.77 V; min 0.67314 / 1.2 = 0.56095, down to 0.560; nominal the midpoint 0.72157, to 0.722; max 0.77 x 1.2 = 0.924"
+
+[stack.oxides.5v0.vt_p]
+range = { min = 0.700, nominal = 0.869, max = 1.078, unit = "V" }
+unit = "V"
+provenance = "derived"
+evidence = ["gf180mcu-models/pfet_06v0/vth0", "xc018/pe5/vt"]
+margin = 1.2
+margin_achieved_min = 1.200
+margin_achieved_max = 1.201
+note = "magnitude of the long-channel PMOS threshold: GF180MCU card vth0 -0.8978 V (magnitude 0.8978), X-FAB XC018 pe5 0.84 V; min 0.84 / 1.2 = 0.700; nominal the midpoint 0.8689, to 0.869; max 0.8978 x 1.2 = 1.07736, up to 1.078"
+
+# Metals. The lower-metal thicknesses have no public source yet; the sheet resistances
+# come from one source (X-FAB XC018 typical data), so their margin is the single-source 1.5.
+[stack.metals.m1]
+note = "no public thickness data; placeholder"
+
+[stack.metals.m1.sheet_rho]
+range = { min = 0.0633, nominal = 0.095, max = 0.1425, unit = "ohm/sq" }
+unit = "ohm/sq"
+provenance = "derived"
+evidence = ["xc018/rm1/rs"]
+margin = 1.5
+margin_achieved_min = 1.501
+margin_achieved_max = 1.500
+note = "XC018 rm1 0.095 ohm/sq, single source: min 0.095 / 1.5 = 0.06333, down to 0.0633; max 0.095 x 1.5 = 0.1425"
+
+[stack.metals.m2]
+note = "no public thickness data; placeholder"
+
+[stack.metals.m2.sheet_rho]
+range = { min = 0.0566, nominal = 0.085, max = 0.1275, unit = "ohm/sq" }
+unit = "ohm/sq"
+provenance = "derived"
+evidence = ["xc018/rm2/rs"]
+margin = 1.5
+margin_achieved_min = 1.502
+margin_achieved_max = 1.500
+note = "XC018 rm2 0.085 ohm/sq, single source: min 0.085 / 1.5 = 0.05667, down to 0.0566; max 0.085 x 1.5 = 0.1275"
+
+[stack.metals.m3]
+note = "no public thickness data; placeholder"
+
+[stack.metals.m3.sheet_rho]
+range = { min = 0.0566, nominal = 0.085, max = 0.1275, unit = "ohm/sq" }
+unit = "ohm/sq"
+provenance = "derived"
+evidence = ["xc018/rm3/rs"]
+margin = 1.5
+margin_achieved_min = 1.502
+margin_achieved_max = 1.500
+note = "XC018 rm3 0.085 ohm/sq, single source: min 0.085 / 1.5 = 0.05667, down to 0.0566; max 0.085 x 1.5 = 0.1275"
+
+[stack.metals.m4]
+note = "no public thickness data; placeholder"
+
+[stack.metals.m4.sheet_rho]
+range = { min = 0.0566, nominal = 0.085, max = 0.1275, unit = "ohm/sq" }
+unit = "ohm/sq"
+provenance = "derived"
+evidence = ["xc018/rm4/rs"]
+margin = 1.5
+margin_achieved_min = 1.502
+margin_achieved_max = 1.500
+note = "XC018 rm4 0.085 ohm/sq, single source: min 0.085 / 1.5 = 0.05667, down to 0.0566; max 0.085 x 1.5 = 0.1275"
+
+[stack.metals.mtop]
+note = "the top metal: any thickness in the range is baseline (spec 3.2)"
+
+[stack.metals.mtop.thickness]
+range = { min = 0.75, nominal = 1.1, max = 3.6, unit = "um" }
+unit = "um"
+provenance = "derived"
+evidence = ["gf180mcu-drm/TM9K", "gf180mcu-drm/TM11K", "gf180mcu-drm/TM30K"]
+margin = 1.2
+margin_reason = "owner's decision, spec 3.2 (2026-10-26): minimum 9 kA minus a margin, maximum 30 kA plus a margin, \"min value of the 9k-extra and a max value of the 30k+extra\", with the 20 % margin of spec 3.6; the 6 kA option (TM6K) is not available and is ignored (owner, 2026-10-27, spec 3.2)"
+margin_achieved_min = 1.200
+margin_achieved_max = 1.200
+note = "GF180MCU top-metal options TM9K 0.9 um, TM11K 1.1 um, TM30K 3.0 um (05_Current_0.18_MCU_9.csv); min 0.9 / 1.2 = 0.75; nominal 1.1 (TM11K); max 3.0 x 1.2 = 3.6"
+
+[stack.metals.mtop.sheet_rho]
+range = { min = 0.008, nominal = 0.037, max = 0.0555, unit = "ohm/sq" }
+unit = "ohm/sq"
+provenance = "derived"
+evidence = ["xc018/rmtp/rs", "xc018/rmtpl/rs"]
+margin = 1.5
+margin_achieved_min = 1.500
+margin_achieved_max = 1.500
+note = "XC018 top metal rmtp 0.037 ohm/sq (thin, the nominal) and thick top metal rmtpl 0.012 ohm/sq, single source: min 0.012 / 1.5 = 0.008; max 0.037 x 1.5 = 0.0555"
 
 [stack.dielectrics.ild1]
 note = "no public thickness data; placeholder"

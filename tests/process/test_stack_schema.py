@@ -45,10 +45,6 @@ def test_implant_and_dielectric_placeholders(process):
                for d in process.stack.dielectrics.values())
 
 
-def test_oxides_and_metals_wait_for_task_7(process):
-    assert process.stack.oxides == {} and process.stack.metals == {}
-
-
 def test_oxide_and_metal_accept_range_fields():
     from ws180g_process.model import MetalLayer, Oxide
 

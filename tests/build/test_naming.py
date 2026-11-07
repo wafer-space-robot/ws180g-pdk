@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Naming checker: library, cell, corner and device names, and the tree walk."""
 
+import subprocess
 from decimal import Decimal
 
 import pytest
@@ -134,3 +135,38 @@ def test_check_tree_missing_directories(tmp):
 
 def test_repository_tree_is_clean(repo_root):
     assert check_tree(repo_root) == []
+
+
+def test_check_tree_wrong_library_and_cell_in_corner_file(tmp):
+    cell = tmp / "libraries" / "ws180g005_fd_pr" / "cells" / "ws180g005_fd_pr__nmos"
+    cell.mkdir(parents=True)
+    (cell / "wrongprefix__nmos__tt_025C_5v00.lib").touch()
+    (cell / "ws180g005_fd_io__nmos__tt_025C_5v00.lib").touch()
+    (cell / "ws180g005_fd_pr__Bad-Cell__tt_025C_5v00.lib").touch()
+    (cell / "ws180g005_fd_pr__nmos__tt_025C_5v00.lib").touch()
+    errors = check_tree(tmp)
+    assert len(errors) == 3
+    assert any("wrongprefix" in e for e in errors)
+    assert any("ws180g005_fd_io__nmos" in e for e in errors)
+    assert any("Bad-Cell" in e for e in errors)
+
+
+def test_check_tree_unprefixed_cell_one_error_and_dot_dirs(tmp):
+    cells = tmp / "libraries" / "ws180g005_fd_pr" / "cells"
+    (cells / "nmos").mkdir(parents=True)
+    (cells / ".git").mkdir()
+    assert len(check_tree(tmp)) == 1
+
+
+def test_console_script_exit_codes(tmp, repo_root):
+    def run(root):
+        return subprocess.run(
+            ["uv", "run", "ws180g-check-names", str(root)],
+            check=False, capture_output=True, text=True, cwd=repo_root,
+        )
+
+    assert run(repo_root).returncode == 0
+    (tmp / "libraries" / "ws180g005_fd_sc_gp_9t").mkdir(parents=True)
+    result = run(tmp)
+    assert result.returncode == 1
+    assert "ws180g005_fd_sc_gp_9t" in result.stdout

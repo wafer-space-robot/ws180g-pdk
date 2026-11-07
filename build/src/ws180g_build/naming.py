@@ -2,7 +2,12 @@
 """Naming rules for libraries, cells, corners and devices, and a tree checker.
 
 Grammar: spec section 6 and the naming document. Each name class has one
-compiled regular expression with named groups and one parser."""
+compiled regular expression with named groups and one parser.
+
+Tree conventions: the stem of a file in a built `libs.ref/<library>/<view>/`
+tree is `<name>.split(".")[0]` and is checked as the cell part of
+`<library>__<stem>`. Per-corner liberty files are named
+`<library>__<cell>__<corner>.lib`."""
 
 import argparse
 import re
@@ -153,14 +158,23 @@ def _problem(path: Path, root: Path, parse, name: str, *args) -> list[str]:
 
 
 def _check_files(library_dir: Path, root: Path) -> list[str]:
-    """Corner names of every `<library>__<cell>__<corner>.*` file under a library."""
+    """Names of every `<library>__<cell>__<corner>.*` file under a library.
+
+    The library part must be the enclosing library directory, the cell part a
+    valid cell, the corner part a valid corner."""
     errors: list[str] = []
     for path in sorted(library_dir.rglob("*")):
         if not path.is_file():
             continue
         parts = path.name.split(".")[0].split("__")
-        if len(parts) == 3:
-            errors += _problem(path, root, parse_corner, parts[2])
+        if len(parts) != 3:
+            continue
+        library, cell, corner = parts
+        found = _problem(path, root, parse_cell, f"{library}__{cell}")
+        found += _problem(path, root, parse_corner, corner)
+        if not found and library != library_dir.name:
+            found = [f"{path.relative_to(root)}: library part is not {library_dir.name}"]
+        errors += found
     return errors
 
 
@@ -173,9 +187,12 @@ def check_tree(root: Path) -> list[str]:
             errors += _problem(lib, root, parse_library, lib.name)
             cells = lib / "cells"
             if cells.is_dir():
-                for cell in sorted(p for p in cells.iterdir() if p.is_dir()):
-                    errors += _problem(cell, root, parse_cell, cell.name)
-                    if not cell.name.startswith(f"{lib.name}__"):
+                for cell in sorted(
+                    p for p in cells.iterdir() if p.is_dir() and not p.name.startswith(".")
+                ):
+                    found = _problem(cell, root, parse_cell, cell.name)
+                    errors += found
+                    if not found and not cell.name.startswith(f"{lib.name}__"):
                         errors.append(f"{cell.relative_to(root)}: does not start with {lib.name}__")
             errors += _check_files(lib, root)
     release = root / "libs.ref"

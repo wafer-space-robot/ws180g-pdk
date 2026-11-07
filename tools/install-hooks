@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+# Symlink every hook in tools/git-hooks/ into the repository's hooks directory
+# (`git rev-parse --git-path hooks`, which honours core.hooksPath). Idempotent. Runs only from
+# the main checkout: the hooks directory is shared by every worktree, and a link into a linked
+# worktree would dangle once that worktree is removed. An existing hook that is not already
+# this symlink is left alone and reported.
+set -euo pipefail
+
+repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+git_dir="$(git -C "$repo" rev-parse --absolute-git-dir)"
+common_dir="$(git -C "$repo" rev-parse --path-format=absolute --git-common-dir)"
+if [[ "$git_dir" != "$common_dir" ]]; then
+    echo "install-hooks: $repo is a linked worktree; run tools/install-hooks from the main checkout" >&2
+    exit 1
+fi
+hooks="$(git -C "$repo" rev-parse --path-format=absolute --git-path hooks)"
+mkdir -p "$hooks"
+
+status=0
+for hook in "$repo"/tools/git-hooks/*; do
+    name="$(basename "$hook")"
+    target="$hooks/$name"
+    if [[ -L "$target" && "$(readlink "$target")" == "$hook" ]]; then
+        echo "install-hooks: $name already installed"
+    elif [[ -e "$target" || -L "$target" ]]; then
+        echo "install-hooks: $target exists and is not a link to $hook; leaving it" >&2
+        status=1
+    else
+        ln -s "$hook" "$target"
+        echo "install-hooks: installed $name -> $hook"
+    fi
+done
+exit "$status"

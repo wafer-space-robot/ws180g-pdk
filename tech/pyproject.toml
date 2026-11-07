@@ -5,10 +5,11 @@ version = "0.0.0"
 description = "ws180g pipeline component: tech"
 requires-python = ">=3.12"
 license = "Apache-2.0"
-dependencies = ["pydantic>=2.11", "ws180g-process"]
+dependencies = ["pydantic>=2.11", "ws180g-process", "ws180g-rules"]
 
 [project.scripts]
 ws180g-klayout-tech = "ws180g_tech.klayout:main"
+ws180g-magic-tech = "ws180g_tech.magic:main"
 
 [build-system]
 requires = ["hatchling"]

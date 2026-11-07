@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: Apache-2.0
+# Lines the private-data checker (ws180g-check-private) allows. Each entry is
+# "<path glob>: <exact line text>" and suppresses only a line with exactly that text in a
+# file the glob matches. Every entry needs a comment above it saying why it is allowed;
+# the comments are scanned too, so they paraphrase the trigger words.
+
+# Design spec, opening summary: states that the foundry manual is under a non-disclosure
+# agreement, which is why nothing is copied from it.
+docs/superpowers/specs/*.md: foundry document under non-disclosure agreement (NDA). See section 13.
+
+# Design spec, section 12 (risks): explains why a failure found against non-disclosure material
+# is never turned into a regression fixture.
+docs/superpowers/specs/*.md:    a regression fixture built from that failure, would put NDA-derived
+
+# Design spec, section 13: the rule itself, nothing is copied from non-disclosure
+# documents.
+docs/superpowers/specs/*.md: - Nothing is copied from a foundry document under NDA or from any document
+
+# Phase 0 plan, Task 20: the specification of this checker, which names the patterns.
+docs/superpowers/plans/*.md: - Produces: `check_private(repo_root) -> list[Finding]` (`path, line, reason`) which (1) loads the evidence set and fails on any entry whose `source` is unregistered or whose source has no `url` or `public != true`; (2) fails on any process field whose `provenance` is not in the allowed set or whose `evidence` ids do not exist in the evidence set; (3) scans every tracked text file outside `tmp/` for the word-boundary, case-insensitive patterns `\bprovenance\s*=\s*"private"`, `\bNDA\b`, `\bconfidential\b`, `\bproprietary\b`, `\binternal use only\b`, with `build/private-allow.txt` listing `<path glob>: <exact line text>` entries that are allowed (the spec's and this plan's own sentences about NDA material, and the checker's own source); (4) recomputes the sha256 of every vendored file against the registry. The test's trigger strings are built at runtime (`"CONFI" + "DENTIAL"`) so the test file never contains them. The pre-commit hook runs `uv run ws180g-check-private` and `uv run ws180g-check-names` on the index; `tools/install-hooks` symlinks it.

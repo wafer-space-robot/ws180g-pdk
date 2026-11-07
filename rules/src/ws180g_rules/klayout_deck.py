@@ -260,24 +260,31 @@ def _min_extension(row: RuleRow, d: _Deck) -> Emitted:
     p_expr = _partner(row, d, a_expr, b_expr)
     a, p = d.expr(a_expr), d.expr(p_expr)
     ab = d.expr(Intersection(a_expr, b_expr))
-    p_ends = d.helper(f"{p}_ends_in_{a}", f"{p}.edges.inside({a})",
+    p_ends = d.helper(f"{p}_edges_in_{a}", f"{p}.edges.inside({a})",
                       f"edges of {p} wholly inside {a}: {p} ending inside {a}")
-    cross = d.helper(f"{ab}_on_{p}", f"{ab}.edges & {p}.edges - {a}.edges - {p_ends}",
+    cross = d.helper(f"{ab}_on_{p}", f"(({ab}.edges & {p}.edges) - {a}.edges) - {p_ends}",
                      f"edges of {ab} on {p} edges where {a} crosses the {p} boundary: "
                      f"without the flush ends (on {a} edges) and the ends of {p} inside {a}")
     flush = d.helper(f"{a}_flush_on_{p}", f"{a}.edges.inside({p}.edges).interacting({ab})",
                      f"edges of {a} lying wholly on {p} edges next to {ab}: {a} ending "
                      f"flush with the {p} boundary (extension 0)")
-    short = d.helper(f"{a}_ends_in_{p}", f"{a}.edges.inside({p})",
-                     f"edges of {a} wholly inside {p}: {a} ending inside {p} (negative "
-                     "extension)")
-    return ([f"extension: {a} must reach at least the value beyond each edge where it crosses",
-             f"the {p} boundary (those edges enclosed by the {a} edges), OR {a} ends flush on",
-             f"the {p} boundary, OR {a} ends inside {p} (a jog of {a} wholly inside {p} is",
-             "reported too). Markers as edges, merged so a flush end counted by",
-             "both selections gives one marker (inside() also takes edges on the boundary)"],
-            (f"({cross}.enclosed({a}.edges, {_um(_value(row))}, euclidian).edges | {flush} | "
-            f"{short}).merged"))
+    v = _um(_value(row))
+    comments = [f"extension: {a} must reach at least the value beyond each edge where it",
+                f"crosses the {p} boundary (those edges enclosed by the {a} edges; first_edges",
+                "keeps only the crossing edge of each pair), OR it ends flush on that boundary"]
+    markers = [f"{cross}.enclosed({a}.edges, {v}, euclidian).first_edges", flush]
+    if b_expr == Name("gate"):
+        short = d.helper(f"{a}_ends_in_{p}", f"{a}.edges.inside({p}).interacting({ab})",
+                         f"edges of {a} wholly inside {p} at a gate: {a} ending inside {p} "
+                         "(negative extension)")
+        markers.append(short)
+        comments += [f"OR {a} ends inside {p} at a gate (a jog of {a} wholly inside {p} is",
+                     "reported too). Markers as edges, merged so a flush end selected twice",
+                     "gives one marker (inside() also takes edges on the boundary)"]
+    else:
+        comments += [f"(an end of {a} inside {p} is governed by the enclosure rule of {p},",
+                     "not here). Markers as edges, merged"]
+    return comments, f"({' | '.join(markers)}).merged"
 
 
 def _min_area(row: RuleRow, d: _Deck) -> Emitted:

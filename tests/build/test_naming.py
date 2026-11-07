@@ -4,7 +4,6 @@
 from decimal import Decimal
 
 import pytest
-
 from ws180g_build.naming import (
     NamingError,
     check_tree,

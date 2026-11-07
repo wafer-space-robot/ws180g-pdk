@@ -126,3 +126,10 @@ def test_refuses_source_dir_inside_repo(sandbox, repo_root):
     """Inside the repo only `tmp/` (gitignored scratch) may be written."""
     res = sandbox.run(["true"], repo_root / "process")
     assert res.returncode == 2
+
+
+def test_versions_json_is_current(sandbox, tmp, repo_root):
+    """docker/versions.json is exactly what docker/probe_versions.py prints in the image."""
+    res = sandbox.run(["python", "/work/src/docker/probe_versions.py"], tmp)
+    assert res.returncode == 0, res.stderr
+    assert res.stdout == (repo_root / "docker" / "versions.json").read_text()

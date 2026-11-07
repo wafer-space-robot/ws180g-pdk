@@ -42,8 +42,9 @@ def test_on_grid_is_exact_decimal_arithmetic():
 
 
 def test_toml_floats_load_as_exact_decimals(data_copy):
-    set_toml(data_copy / "process.toml", ["grid", "value"], 0.435)
-    assert load_process(data_copy).grid.value == Decimal("0.435")
+    # a binary float would make 0.435 off the 0.005 grid; the loader keeps the literal
+    set_toml(data_copy / "rules.toml", ["rules", '"m1.w"', "value"], 0.435)
+    assert load_process(data_copy).rules["m1.w"].value == Decimal("0.435")
 
 
 def _lines(data_copy) -> list[str]:

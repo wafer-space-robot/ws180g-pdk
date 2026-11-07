@@ -144,13 +144,13 @@ def test_cited_evidence_exists(process, evidence):
 
 def test_a_topology_rule_has_no_value():
     with pytest.raises(ValueError):
-        RuleField(kind="topology", layers=["co"], value=Decimal("1"), unit="um",
+        RuleField(kind="topology", layers=["co"], value=Decimal(1), unit="um",
                   variant="ws180g005", provenance="public-source", fixture="x")
 
 
 def test_a_valued_rule_needs_a_unit():
     with pytest.raises(ValueError):
-        RuleField(kind="min-width", layers=["co"], value=Decimal("1"), variant="ws180g005",
+        RuleField(kind="min-width", layers=["co"], value=Decimal(1), variant="ws180g005",
                   provenance="derived")
 
 

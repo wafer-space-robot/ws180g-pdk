@@ -5,6 +5,7 @@ Every file's problems are collected and raised together as one `ProcessError`, o
 problem in the form `<file>: <key>: <message>`.
 """
 
+import re
 import tomllib
 from decimal import Decimal
 from pathlib import Path
@@ -12,13 +13,30 @@ from typing import get_args, get_origin
 
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
-from ws180g_process.model import Datatypes, Layer, Mask, Process, Variant
+from ws180g_process.model import Datatypes, Layer, Mask, Process, RuleField, Variant
 from ws180g_process.ranges import on_grid
 
 DEFAULT_DATA = Path(__file__).resolve().parents[2] / "data" / "ws180g"
 
 # The database unit in um; every grid is a whole multiple of it.
 DATABASE_UNIT = Decimal("0.001")
+
+# Areas (um2) are rounded up to a multiple of this.
+AREA_STEP = Decimal("0.005")
+
+# The margin floors (spec 3.6) and the standard ratios a margin may take without a
+# `margin_reason`: 1.2, 1.5 for a single source, 1.25 for a x0.8 maximum.
+MARGIN_FLOOR = Decimal("1.2")
+MAXIMUM_FLOOR = Decimal("1.25")
+STANDARD_MARGINS = {
+    Decimal("1.2"): "the 20 % rule",
+    Decimal("1.5"): "the single-source rule",
+    Decimal("1.25"): "the x0.8 maximum rule",
+}
+
+# Splits a layer expression into names once `.sized(<field path>)` calls are dropped.
+_SIZED = re.compile(r"\.sized\([^()]*\)")
+_OPERATORS = re.compile(r"[|&\-()\s]+")
 
 # Which file holds each top-level key of `Process`.
 KEY_FILE = {
@@ -75,8 +93,23 @@ def load_process(data_dir: Path = DEFAULT_DATA) -> Process:
     errors += _check_layers(valid.get("layers", {}), known, valid.get("datatypes"))
     raw_layers = data.get("layers")
     layer_names = set(raw_layers) if isinstance(raw_layers, dict) else set()
-    errors += _check_masks(valid.get("masks", []), layer_names, valid.get("layers", {}), known)
-    errors += _check_litho(valid.get("stack", {}).get("litho", {}), layer_names)
+    base = {n for n, v in raw_variants.items()
+            if isinstance(v, dict) and v.get("contains") == []} if known else set()
+    errors += _check_masks(
+        valid.get("masks", []), layer_names, valid.get("layers", {}), known, base)
+    raw_stack = data.get("stack")
+    raw_stack = raw_stack if isinstance(raw_stack, dict) else {}
+    errors += _check_litho(_table(raw_stack, "litho"), layer_names, valid.get("masks", []))
+    rules = valid.get("rules", {})
+    rule_names = set(rules) if "rules" in valid else None
+    errors += _check_stack_paths(raw_stack, rule_names)
+    errors += _check_stack_margins(raw_stack)
+    modules = {layer.module for layer in valid.get("layers", {}).values() if layer.module}
+    names = layer_names | set(valid.get("aliases", {}))
+    errors += _check_aliases(valid.get("aliases", {}), names)
+    grid = data.get("grid", {}).get("value") if isinstance(data.get("grid"), dict) else None
+    errors += _check_rules(rules, names, known, modules,
+                           grid if _is_number(grid) and grid > 0 else None)
     if errors:
         errors.sort(key=lambda e: FILES.index(e.file) if e.file in FILES else len(FILES))
         raise ProcessError.collected(errors)
@@ -271,10 +304,12 @@ def _check_layers(
 
 
 def _check_masks(
-    masks: list[Mask | None], layer_names: set[str], layers: dict[str, Layer], known: set[str]
+    masks: list[Mask | None], layer_names: set[str], layers: dict[str, Layer], known: set[str],
+    base: set[str],
 ) -> list[ProcessError]:
     """Each mask is a layer of the layer map, listed once, drawn exactly when its layer is,
-    and names a known variant."""
+    names a known variant, and has its layer's module and variant (a mask of a layer that
+    first appears in a base variant, one that contains no other, names no variant)."""
     errors = []
     seen: dict[str, int] = {}
     for index, mask in enumerate(masks):
@@ -294,9 +329,149 @@ def _check_masks(
         if mask.variant is not None and mask.variant not in known:
             errors.append(ProcessError(
                 "masks.toml", f"{key}.variant", f"unknown variant {mask.variant}"))
+        if layer is None:
+            continue
+        if mask.module != layer.module:
+            errors.append(ProcessError(
+                "masks.toml", f"{key}.module",
+                f"{mask.name}: mask module {mask.module} differs from layer module "
+                f"{layer.module}"))
+        expected = None if layer.variant in base else layer.variant
+        if mask.variant != expected:
+            errors.append(ProcessError(
+                "masks.toml", f"{key}.variant",
+                f"{mask.name}: mask variant {mask.variant} differs from {expected} (layer "
+                f"variant {layer.variant})"))
     return errors
 
 
-def _check_litho(litho: dict, layer_names: set[str]) -> list[ProcessError]:
-    return [ProcessError("stack.toml", f"stack.litho.{name}", "not a layer")
-            for name in litho if name not in layer_names]
+def _table(table: dict, key: str) -> dict:
+    """`table[key]` when it is a table, else an empty one (its schema error is reported)."""
+    value = table.get(key)
+    return value if isinstance(value, dict) else {}
+
+
+def _check_litho(
+    litho: dict, layer_names: set[str], masks: list[Mask | None]
+) -> list[ProcessError]:
+    """Each litho entry is a layer, and every baseline drawn mask has one."""
+    errors = [ProcessError("stack.toml", f"stack.litho.{name}", "not a layer")
+              for name in litho if name not in layer_names]
+    for mask in masks:
+        if mask is not None and mask.baseline and mask.drawn and mask.name not in litho:
+            errors.append(ProcessError(
+                "stack.toml", "stack.litho", f"no entry for baseline drawn mask {mask.name}"))
+    return errors
+
+
+def _rule_path_error(path: object, rule_names: set[str]) -> str | None:
+    """Why `path` is not the full dotted path of a rule, or None when it is one."""
+    if not isinstance(path, str) or not path.startswith("rules."):
+        return f"{path!r} is not a rules.<id> field path"
+    if path.removeprefix("rules.") not in rule_names:
+        return f"{path} names no rule"
+    return None
+
+
+def _check_stack_paths(stack: dict, rule_names: set[str] | None) -> list[ProcessError]:
+    """`stack.litho.*.min_feature/min_space` and `stack.oxides.*.lmin_n/lmin_p` name rules.
+    Skipped when the rules failed to load (their errors are reported)."""
+    if rule_names is None:
+        return []
+    errors = []
+    for table, keys in (("litho", ("min_feature", "min_space")),
+                        ("oxides", ("lmin_n", "lmin_p"))):
+        for name, entry in _table(stack, table).items():
+            if not isinstance(entry, dict):
+                continue
+            for key in keys:
+                if key in entry and (why := _rule_path_error(entry[key], rule_names)):
+                    errors.append(ProcessError(
+                        "stack.toml", f"stack.{table}.{name}.{key}", why))
+    return errors
+
+
+def _margin_error(margin: object, reason: object, floor: Decimal) -> str | None:
+    """Why a field's `margin` is not acceptable, or None. The margin is at least `floor`; a
+    margin other than a standard ratio needs a `margin_reason`."""
+    if not _is_number(margin):
+        return None  # absent, or a schema error
+    if margin < floor:
+        return f"margin {margin} is below the floor {floor} (spec 3.6)"
+    if Decimal(margin) not in STANDARD_MARGINS and not (isinstance(reason, str) and reason):
+        return (f"margin {margin} is none of the standard ratios "
+                f"({', '.join(f'{k} {v}' for k, v in STANDARD_MARGINS.items())}) "
+                "and has no margin_reason")
+    return None
+
+
+def _check_stack_margins(stack: dict) -> list[ProcessError]:
+    """The margin rules on the range fields of oxides and metals."""
+    errors = []
+    for table, keys in (("oxides", ("thickness", "vt_n", "vt_p")),
+                        ("metals", ("thickness", "sheet_rho"))):
+        for name, entry in _table(stack, table).items():
+            if not isinstance(entry, dict):
+                continue
+            for key in keys:
+                field = entry.get(key)
+                if isinstance(field, dict) and (why := _margin_error(
+                        field.get("margin"), field.get("margin_reason"), MARGIN_FLOOR)):
+                    errors.append(ProcessError(
+                        "stack.toml", f"stack.{table}.{name}.{key}.margin", why))
+    return errors
+
+
+def _expression_names(expr: str) -> set[str]:
+    """The bare layer names and aliases in a layer expression; the field path of a
+    `.sized(<field path>)` call is dropped, the argument of `.unrelated(<expr>)` kept."""
+    expr = _SIZED.sub("", expr).replace(".unrelated(", "|(")
+    return {name for name in _OPERATORS.split(expr) if name}
+
+
+def _check_aliases(aliases: dict[str, str], names: set[str]) -> list[ProcessError]:
+    errors = []
+    for alias, expr in aliases.items():
+        if unknown := sorted(_expression_names(expr) - names):
+            errors.append(ProcessError(
+                "rules.toml", f"aliases.{alias}", f"unknown layer {', '.join(unknown)}"))
+    return errors
+
+
+def _check_rules(
+    rules: dict[str, RuleField], names: set[str], known: set[str], modules: set[str],
+    grid: Decimal | None,
+) -> list[ProcessError]:
+    """Cross-checks of each rule: known layers, variant and module; field paths that resolve;
+    lengths on the grid and areas on the area step; the margin floors and standard ratios;
+    a fixture for every topology rule."""
+    errors = []
+
+    def error(rid: str, key: str, message: str) -> None:
+        errors.append(ProcessError("rules.toml", f"rules.{rid}.{key}", message))
+
+    for rid, rule in rules.items():
+        for expr in rule.layers:
+            if unknown := sorted(_expression_names(expr) - names):
+                error(rid, "layers", f"unknown layer {', '.join(unknown)} in {expr!r}")
+        if rule.edge_layer is not None and rule.edge_layer not in names:
+            error(rid, "edge_layer", f"unknown layer {rule.edge_layer}")
+        if known and rule.variant not in known:
+            error(rid, "variant", f"unknown variant {rule.variant}")
+        if rule.module is not None and rule.module not in modules:
+            error(rid, "module", f"unknown module {rule.module}")
+        if rule.implied_by is not None and (why := _rule_path_error(rule.implied_by, set(rules))):
+            error(rid, "implied_by", why)
+        for path in rule.composed_of:
+            if "/" not in path and (why := _rule_path_error(path, set(rules))):
+                error(rid, "composed_of", why)  # an id with "/" is an evidence entry
+        if rule.unit == "um" and grid is not None and not on_grid(rule.value, grid):
+            error(rid, "value", f"{rule.value} um is not on the {grid} um grid")
+        if rule.unit == "um2" and not on_grid(rule.value, AREA_STEP):
+            error(rid, "value", f"{rule.value} um2 is not a multiple of {AREA_STEP} um2")
+        floor = MAXIMUM_FLOOR if rule.kind == "max-distance" else MARGIN_FLOOR
+        if why := _margin_error(rule.margin, rule.margin_reason, floor):
+            error(rid, "margin", why)
+        if rule.kind == "topology" and not rule.fixture:
+            error(rid, "fixture", "missing: a topology rule names its fixture")
+    return errors

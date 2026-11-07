@@ -189,3 +189,70 @@ def test_console_script_exit_code(repo_root, tmp, data_copy):
                          cwd=repo_root, capture_output=True, text=True, check=False)
     assert bad.returncode == 1, bad.stdout + bad.stderr
     assert "under-margin" in bad.stdout
+
+
+def test_co_size_cites_both_scmos_contact_sections(report):
+    ids = {e.id for e in report["rules.co.size"].cited}
+    assert {"scmos8/5.1/subm", "scmos8/6.1/deep", "scmos8/6.1/subm"} <= ids
+    assert report["rules.co.size"].status == "exempt" and report["rules.co.size"].bound == Decimal("0.22")
+
+
+def test_topology_only_citation_is_uncovered(data_copy, evidence):
+    # Drop the polysilicon-contact size from co.size: only the topology rule cut.ortho still
+    # cites scmos8/5.1/*, and a topology row compares nothing.
+    path = data_copy / "rules.toml"
+    text = path.read_text()
+    old = '"scmos8/5.1/deep", "scmos8/5.1/subm", "scmos8/6.1/deep"'
+    assert old in text
+    path.write_text(text.replace(old, '"scmos8/6.1/deep"', 1))
+    r = margin_report(load_process(data_copy), evidence)
+    ids = {e.id for e in r.uncovered}
+    assert {"scmos8/5.1/deep", "scmos8/5.1/subm"} <= ids
+    assert "rules.cut.ortho" in r.notes["scmos8/5.1/deep"]
+    assert "topology rule" in r.notes["scmos8/5.1/deep"]
+    assert "scmos8/5.1/deep" in r.to_markdown() and "cited only by topology rule" in r.to_markdown()
+
+
+def test_topology_row_has_no_bound(report):
+    assert report["rules.cut.ortho"].bound is None and report["rules.co.in"].bound is None
+
+
+def test_zero_bound_is_under_margin(process, evidence):
+    entries = dict(evidence.entries)
+    for e in report_cited(process, evidence, "m1.w"):
+        entries[e] = entries[e].model_copy(update={"value": Decimal(0)})
+    r = margin_report(process, evidence.model_copy(update={"entries": entries}))
+    assert r["rules.m1.w"].status == "under-margin" and r["rules.m1.w"].message
+    assert r.ok is False
+
+
+def report_cited(process, evidence, rid):
+    return [i for i in process.rules[rid].evidence if evidence.entries[i].value is not None]
+
+
+def test_composed_value_not_positive_is_under_margin(data_copy, evidence):
+    set_toml(data_copy / "rules.toml", ["rules", '"sel.x"', "value"], 0.665)
+    r = margin_report(load_process(data_copy), evidence)
+    row = r["rules.nd.s.pgate"]
+    assert row.status == "under-margin" and "0.665" in row.message and r.ok is False
+
+
+def test_only_vt_p_is_a_magnitude(process, evidence):
+    entries = dict(evidence.entries)
+    toxe = "gf180mcu-models/nfet_06v0/toxe"
+    entries[toxe] = entries[toxe].model_copy(update={"value": Decimal("-15.2")})
+    r = margin_report(process, evidence.model_copy(update={"entries": entries}))
+    assert r["stack.oxides.5v0.thickness.min"].bound == Decimal("-15.2")
+    assert r["stack.oxides.5v0.thickness.min"].status == "under-margin"
+    assert margin_report(process, evidence)["stack.oxides.5v0.vt_p.max"].bound == Decimal("0.8978")
+
+
+# A grid every rule value lies on (the loader checks that) but which is not a multiple of the
+# GF180MCU 0.005 um grid; 0.004 um does not load (0.265, 3.675, 6.505 are off it).
+GRID_OFF = 0.001
+
+
+def test_grid_not_a_multiple_fails(data_copy, evidence):
+    set_toml(data_copy / "process.toml", ["grid", "value"], GRID_OFF)
+    r = margin_report(load_process(data_copy), evidence)
+    assert r.grid_ok is False and r.ok is False

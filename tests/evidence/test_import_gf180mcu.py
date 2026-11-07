@@ -29,11 +29,21 @@ def test_entry_ids_and_columns(gf_entries):
     assert gf_entries["gf180mcu-drm/MT.1/b"].guideline is True and gf_entries["gf180mcu-drm/MT.1/b"].value == Decimal("0.44")
     assert gf_entries["gf180mcu-drm/TM30K"].kind == "thickness" and gf_entries["gf180mcu-drm/TM30K"].value == Decimal("3.0")
     assert gf_entries["gf180mcu-drm/LU.1/mv/a"].kind == "max-distance" and gf_entries["gf180mcu-drm/LU.1/mv/a"].value == Decimal(15)
+    assert gf_entries["gf180mcu-drm/PRES.8"].unit == "mA/um"           # unit in the description
+    assert gf_entries["gf180mcu-drm/LRES.8"].unit == "mA/um"           # printed (mA/m)
+    assert gf_entries["gf180mcu-drm/TM.1a"].value == Decimal(40)       # table headed NO.
+    assert gf_entries["gf180mcu-drm/PM.2"].value == Decimal(50)
 
 
 def test_golden_poly_table(repo_root, tmp):
     import_gf180mcu_table(repo_root / "evidence/sources/gf180mcu-drm/16_Poly2_42.csv", tmp / "poly.toml")
     assert tomllib.loads((tmp / "poly.toml").read_text()) == tomllib.loads((repo_root / "tests/evidence/golden/16_Poly2_42.toml").read_text())
+    # Checked without the golden file, from the CSV by hand.
+    entries = {e["id"]: e for e in tomllib.loads((tmp / "poly.toml").read_text())["entry"]}
+    assert entries["gf180mcu-drm/PL.1/5v"]["value"] == 0.2 and entries["gf180mcu-drm/PL.1/5v"]["kind"] == "min-width"
+    assert entries["gf180mcu-drm/PL.8/5v"]["kind"] == "density-floor" and entries["gf180mcu-drm/PL.8/5v"]["value"] == 14
+    assert entries["gf180mcu-drm/PL.8/5v"]["unit"] == "%"
+    assert entries["gf180mcu-drm/PL.10/5v"]["guideline"] is True and entries["gf180mcu-drm/PL.10/5v"]["unit"] == "mA/um"
 
 
 def test_importer_is_reproducible(tmp, repo_root):
@@ -49,4 +59,4 @@ def test_vendored_sha256_matches(evidence, repo_root):
 def test_every_vendored_table_is_registered(evidence, repo_root):
     vendored = {p.name for p in (repo_root / "evidence/sources/gf180mcu-drm").glob("*.csv")}
     assert len(vendored) == 85
-    assert set(evidence.sources["gf180mcu-drm"].sha256) == vendored
+    assert set(evidence.sources["gf180mcu-drm"].sha256) == vendored | {"LICENSE"}

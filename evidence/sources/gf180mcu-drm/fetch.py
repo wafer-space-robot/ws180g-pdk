@@ -4,7 +4,7 @@
 Resolves the branch (default `main`) to a commit, downloads every CSV of
 `docs/physical_verification/design_manual/tables_clear/` at that commit and the repository's
 LICENSE into this directory, byte for byte, and rewrites the `[sources.gf180mcu-drm]` table of
-`evidence/data/sources.toml` with the commit, the retrieval date and each file's sha256.
+`evidence/data/sources.toml` with the commit, the retrieval date and the sha256 of each file, LICENSE included.
 
 Run: uv run --no-project python -I evidence/sources/gf180mcu-drm/fetch.py [branch-or-commit]
 Standard library only.
@@ -78,7 +78,9 @@ def main(ref: str = "main") -> None:
         data = _get(f"{raw}/{TABLES}/{name}")
         (HERE / name).write_bytes(data)
         digests[name] = hashlib.sha256(data).hexdigest()
-    (HERE / "LICENSE").write_bytes(_get(f"{raw}/LICENSE"))
+    licence = _get(f"{raw}/LICENSE")
+    (HERE / "LICENSE").write_bytes(licence)
+    digests["LICENSE"] = hashlib.sha256(licence).hexdigest()
     retrieved = datetime.date.today().isoformat()
     header = "# SPDX-License-Identifier: Apache-2.0\n"
     text = SOURCES_TOML.read_text() if SOURCES_TOML.exists() else header

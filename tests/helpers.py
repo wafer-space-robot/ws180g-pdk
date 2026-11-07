@@ -5,8 +5,6 @@ import re
 import tempfile
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-
 
 def _literal(value: object) -> str:
     if isinstance(value, bool):
@@ -46,14 +44,12 @@ def set_toml(path: Path, keys: list[str], value: object) -> None:
     raise KeyError(".".join(keys))
 
 
-def evidence_dir_with(entries: list[dict], sources: dict) -> Path:
-    """A fresh evidence data directory holding `sources.toml` and `entries.toml`.
+def evidence_dir_with(entries: list[dict], sources: dict, root: Path) -> Path:
+    """A fresh evidence data directory under `root` (pass pytest's `tmp`) holding
+    `sources.toml` and `entries.toml`.
 
     `sources` maps a source id to its table; each entry is one `[[entry]]` table and gets
-    `rule`, `text` and `cite` filled in when it lacks them. The directory lies under the
-    repository's `tmp/`."""
-    root = REPO_ROOT / "tmp" / "evidence-dirs"
-    root.mkdir(parents=True, exist_ok=True)
+    `rule`, `text` and `cite` filled in when it lacks them."""
     out = Path(tempfile.mkdtemp(dir=root))
     lines: list[str] = []
     for name, table in sources.items():

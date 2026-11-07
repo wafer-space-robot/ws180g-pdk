@@ -10,7 +10,7 @@ SOURCE = {"title": "Foo manual", "url": "https://example.org/foo", "licence": "C
 
 
 def test_unregistered_source_rejected(tmp):
-    bad = evidence_dir_with([{"id": "foo/X.1", "source": "foo", "kind": "min-width", "value": 1}], sources={})
+    bad = evidence_dir_with([{"id": "foo/X.1", "source": "foo", "kind": "min-width", "value": 1}], sources={}, root=tmp)
     with pytest.raises(EvidenceError, match="source"):
         load_evidence(bad)
 
@@ -18,7 +18,7 @@ def test_unregistered_source_rejected(tmp):
 def test_registered_source_loads(tmp):
     good = evidence_dir_with(
         [{"id": "foo/X.1", "source": "foo", "kind": "min-width", "value": 1.5, "lambda": 2.5}],
-        sources={"foo": SOURCE})
+        sources={"foo": SOURCE}, root=tmp)
     evidence = load_evidence(good)
     entry = evidence.entries["foo/X.1"]
     assert entry.value == Decimal("1.5") and entry.lambda_ == Decimal("2.5")
@@ -31,7 +31,7 @@ def test_every_error_reported_at_once(tmp):
          {"id": "foo/X.3", "source": "foo", "kind": "nonsense", "value": 1},
          {"id": "bar/X.2", "source": "bar", "kind": "min-width", "value": 1},
          {"id": "foo/X.1", "source": "foo", "kind": "min-width", "value": 1}],
-        sources={"foo": SOURCE})
+        sources={"foo": SOURCE}, root=tmp)
     with pytest.raises(EvidenceError) as caught:
         load_evidence(bad)
     lines = str(caught.value).splitlines()
@@ -44,7 +44,7 @@ def test_every_error_reported_at_once(tmp):
 
 def test_id_must_start_with_source(tmp):
     bad = evidence_dir_with([{"id": "bar/X.1", "source": "foo", "kind": "min-width", "value": 1}],
-                            sources={"foo": SOURCE})
+                            sources={"foo": SOURCE}, root=tmp)
     with pytest.raises(EvidenceError, match="id"):
         load_evidence(bad)
 

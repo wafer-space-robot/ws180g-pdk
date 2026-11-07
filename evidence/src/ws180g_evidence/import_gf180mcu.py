@@ -27,8 +27,10 @@ DEFAULT_OUT = REPO / "evidence" / "data" / f"{SOURCE}.toml"
 GRID_TABLE = "10_Design_Geometry_Rules27.csv"
 METAL_OPTION_TABLE = "05_Current_0.18_MCU_9.csv"
 
-# Normalised header cells of a rule table, and whether every row is a guideline.
-RULE_HEADERS = {"RULE NO": False, "GUIDELINE NO": True}
+# Normalised header cells of a rule table, and whether every row is a guideline. A table
+# headed `NO.` (31_Top_Metal_76, 32_Probe_pad_79) is a rule table only when its second
+# header cell is `DESCRIPTION`; `No.` also heads the device list.
+RULE_HEADERS = {"RULE NO": False, "GUIDELINE NO": True, "NO": False}
 
 # The ordered kind match on the description: the first pattern that matches wins.
 _MINMAX = r"\bmin\.?\s*/\s*max"
@@ -57,8 +59,12 @@ CONDITIONED = re.compile(r"^(?P<value>[^()]+?)\s*\((?P<condition>[^()]*)\)$")
 PART_LETTER = re.compile(r"^\(?(?P<letter>[a-z]\d?)\\?\)\s*")
 # A percentage in a coverage description: `>= 14%`, `>30%`.
 PERCENT = re.compile(r"(\d+(?:\.\d+)?)\s*%")
-# A unit named in the description: `Min. COMP area (um2)`.
-DESCRIPTION_UNIT = re.compile(r"\(\s*([uμµ]m2)\s*\)")
+# A unit named in the description: `Min. COMP area (um2)`, `current density ... (mA/um)`.
+DESCRIPTION_UNIT = re.compile(r"\(\s*([uμµ]m2|mA/[uμµ\uf06d]?m)\s*\)")
+# LRES.8 prints `(mA/\uf06dm)`: a Symbol-font micro sign in a private-use code point, shown
+# as `(mA/m)`. 70_not_coded_rules_187.csv row LRES.8 gives the unit as mA/um.
+MA_PER_UM_NOTE = (" [unit printed as (mA/m) with a Symbol-font micro sign U+F06D or none;"
+                  " read as mA/um as in 70_not_coded_rules_187.csv row LRES.8]")
 NOT_A_VALUE = {"", "NA", "-", "--"}
 
 KEY_ORDER = ["id", "source", "rule", "column", "part", "kind", "layers", "value", "unit",
@@ -68,12 +74,14 @@ KEY_ORDER = ["id", "source", "rule", "column", "part", "kind", "layers", "value"
 def import_gf180mcu(src_dir: Path = DEFAULT_SRC, out_path: Path = DEFAULT_OUT) -> int:
     """Import every table of `src_dir` into one TOML file; return the number of entries.
 
-    Prints the tables skipped as not being rule tables."""
+    Prints the tables skipped as not being rule tables and the value cells dropped because
+    they hold no plain number."""
     entries: list[Entry] = []
     imported: list[str] = []
     skipped: list[str] = []
+    dropped: list[str] = []
     for csv_path in sorted(src_dir.glob("*.csv")):
-        table = table_entries(csv_path)
+        table = table_entries(csv_path, dropped)
         if table is None:
             skipped.append(csv_path.name)
         else:
@@ -85,31 +93,49 @@ def import_gf180mcu(src_dir: Path = DEFAULT_SRC, out_path: Path = DEFAULT_OUT) -
     print(f"skipped {len(skipped)} tables that are not rule tables:")
     for name in skipped:
         print(f"  {name}")
+    _print_dropped(dropped)
     return len(entries)
 
 
 def import_gf180mcu_table(csv_path: Path, out_path: Path) -> int:
     """Import one table into a TOML file of its own; return the number of entries."""
-    entries = table_entries(csv_path) or []
+    dropped: list[str] = []
+    entries = table_entries(csv_path, dropped) or []
     _check_unique(entries)
     _write(entries, out_path)
+    _print_dropped(dropped)
     return len(entries)
 
 
-def table_entries(csv_path: Path) -> list[Entry] | None:
-    """The entries of one table, or `None` when it is not a rule table."""
+def _print_dropped(dropped: list[str]) -> None:
+    print(f"dropped {len(dropped)} value cells that hold no plain number:")
+    for line in dropped:
+        print(f"  {line}")
+
+
+def table_entries(csv_path: Path, dropped: list[str] | None = None) -> list[Entry] | None:
+    """The entries of one table, or `None` when it is not a rule table. Value cells that
+    hold text rather than a number are appended to `dropped` as
+    `<file>, row <rule>, column <column or ->: <cell>`."""
     with csv_path.open(encoding="utf-8-sig", newline="") as f:
         rows = list(csv.reader(f))
     if csv_path.name == METAL_OPTION_TABLE:
         return _metal_options(csv_path.name, rows)
-    if _header(rows) not in RULE_HEADERS:
+    if not _is_rule_table(rows):
         return None
-    return _rule_table(csv_path.name, rows)
+    return _rule_table(csv_path.name, rows, [] if dropped is None else dropped)
 
 
 def _header(rows: list[list[str]]) -> str:
     """The first header cell, normalised: `Rule NO` and `RULE\\nNO.` give `RULE NO`."""
     return _normalise(rows[0][0]).upper().rstrip(".") if rows and rows[0] else ""
+
+
+def _is_rule_table(rows: list[list[str]]) -> bool:
+    header = _header(rows)
+    if header == "NO":
+        return len(rows[0]) > 1 and _normalise(rows[0][1]).upper() == "DESCRIPTION"
+    return header in RULE_HEADERS
 
 
 def _normalise(text: str) -> str:
@@ -158,7 +184,7 @@ def _value_columns(rows: list[list[str]]) -> tuple[list[tuple[int, str | None]],
     return [(2, None)], first
 
 
-def _rule_table(file: str, rows: list[list[str]]) -> list[Entry]:
+def _rule_table(file: str, rows: list[list[str]], dropped: list[str]) -> list[Entry]:
     all_guideline = RULE_HEADERS[_header(rows)]
     columns, first = _value_columns(rows)
     entries: list[Entry] = []
@@ -193,12 +219,18 @@ def _rule_table(file: str, rows: list[list[str]]) -> list[Entry]:
             percent = PERCENT.search(description)
             if percent:
                 cells = [(column, f"{percent.group(1)}%") for column, _ in cells]
+        described = DESCRIPTION_UNIT.search(description)
+        if described and described.group(1) in ("mA/m", "mA/\uf06dm"):
+            text += MA_PER_UM_NOTE
         for column, cell in cells:
-            for part, value, unit, star in _values(cell, rule):
+            values = _values(cell, rule)
+            if not values and _normalise(cell) not in NOT_A_VALUE:
+                dropped.append(f"{file}, row {rule}, column {column or '-'}: {_normalise(cell)}")
+            for part, value, unit, star in values:
                 if part_letter:
                     part = part_letter if part is None else f"{part_letter}-{part}"
-                if unit is None and DESCRIPTION_UNIT.search(description):
-                    unit = "um2"
+                if unit is None and described:
+                    unit = _unit(described.group(1))
                 kind = _kind(lines[0] if lines else "", unit)
                 if kind == "other":
                     kind = _kind(description, unit)
@@ -267,6 +299,7 @@ def _letters(count: int) -> list[str]:
 
 
 def _unit(token: str | None) -> str | None:
+    """The unit a token stands for; `mA/m` (the LRES.8 misprint) is mA/um."""
     if token is None:
         return None
     if token.endswith("m2"):

@@ -62,7 +62,9 @@ class Row:
     """One checked field. `cited` holds every cited entry that exists (binding, guideline or
     without a value), `informative` the guideline ones among them, `missing` the cited ids
     the evidence set does not have; `recorded` is the field's own `margin_achieved`
-    (`_min`/`_max` for a range row)."""
+    (`_min`/`_max` for a range row). `compared` is false for a row that compares no value
+    (a topology rule); its citations do not count as coverage. `message` says why a ratio
+    could not be formed."""
 
     field: str
     section: str
@@ -79,6 +81,8 @@ class Row:
     recorded: Decimal | None
     margin_reason: str
     status: Status
+    compared: bool = True
+    message: str = ""
 
     @property
     def binding(self) -> list[Entry]:
@@ -94,6 +98,7 @@ class Report:
     grids: list[Entry]
     entry_counts: dict[str, int] = field(default_factory=dict)
     cited_counts: dict[str, int] = field(default_factory=dict)
+    notes: dict[str, str] = field(default_factory=dict)
 
     def __getitem__(self, key: str) -> Row:
         for row in self.rows:
@@ -143,13 +148,20 @@ def margin_report(process: "Process", evidence: Evidence) -> Report:
     rows = [_rule_row(rid, rule, process, evidence) for rid, rule in process.rules.items()]
     for name, oxide in process.stack.oxides.items():
         for key in OXIDE_FIELDS:
-            rows += _range_rows(f"stack.oxides.{name}.{key}", getattr(oxide, key), evidence)
+            rows += _range_rows(f"stack.oxides.{name}.{key}", getattr(oxide, key), evidence,
+                                magnitude=key == "vt_p")
     for name, metal in process.stack.metals.items():
         for key in METAL_FIELDS:
             if (value := getattr(metal, key)) is not None and value.range is not None:
                 rows += _range_rows(f"stack.metals.{name}.{key}", value, evidence)
-    cited = _cited_ids(process)
-    uncovered = [e for e in evidence.entries.values() if _binding(e) and e.id not in cited]
+    grids = [e for e in evidence.entries.values() if e.kind == "grid"]
+    citers = _citations(process)
+    cited = set(citers)
+    # Coverage: an entry is covered only by a row that compares a value with it (or by the
+    # grid check); a citation from a topology rule alone leaves it uncovered, annotated.
+    compared = {e.id for r in rows if r.compared for e in r.cited} | {e.id for e in grids}
+    uncovered = [e for e in evidence.entries.values() if _binding(e) and e.id not in compared]
+    notes = {e.id: _note(citers[e.id], process) for e in uncovered if e.id in citers}
     entry_counts = {s: 0 for s in evidence.sources}
     cited_counts = {s: 0 for s in evidence.sources}
     for entry in evidence.entries.values():
@@ -160,9 +172,25 @@ def margin_report(process: "Process", evidence: Evidence) -> Report:
         rows=rows, uncovered=uncovered,
         sources=sorted(evidence.sources.values(), key=lambda s: s.id),
         grid=process.grid.value,
-        grids=[e for e in evidence.entries.values() if e.kind == "grid"],
-        entry_counts=entry_counts, cited_counts=cited_counts,
+        grids=grids, entry_counts=entry_counts, cited_counts=cited_counts, notes=notes,
     )
+
+
+def _note(paths: list[str], process: "Process") -> str:
+    """Why a cited entry is still uncovered: the fields that cite it compare nothing."""
+    names = ", ".join(f"`{p}`" for p in paths)
+    rules = [p.removeprefix("rules.") for p in paths if p.startswith("rules.")]
+    if len(rules) == len(paths) and all(process.rules[r].kind == "topology" for r in rules):
+        return f"cited only by topology rule(s) {names}"
+    return f"cited only by field(s) that compare no value: {names}"
+
+
+def _ratio(numerator: Decimal, denominator: Decimal) -> tuple[Decimal | None, str]:
+    """The rounded ratio, or `None` and the reason when either side is not positive."""
+    if numerator <= 0 or denominator <= 0:
+        return None, (f"no margin ratio {numerator} / {denominator}: both sides must be "
+                      "positive")
+    return achieved_ratio(numerator, denominator), ""
 
 
 def _binding(entry: Entry) -> bool:
@@ -188,7 +216,8 @@ def _computed_margin(binding: list[Entry], maximum: bool) -> tuple[Decimal, bool
 
 def _status(*, missing: list[str], provenance: str, has_bound: bool,
             achieved: Decimal | None, required: Decimal | None, reason: str,
-            floor: Decimal, recorded: Decimal | None, implied: bool) -> Status:
+            floor: Decimal, recorded: Decimal | None, implied: bool,
+            message: str = "") -> Status:
     """The status of a margined row; failures first, in a fixed order."""
     if missing:
         return "missing-entry"
@@ -196,6 +225,8 @@ def _status(*, missing: list[str], provenance: str, has_bound: bool,
         # A value without a binding entry is `chosen`; one that claims to be derived from
         # the evidence but cites nothing binding has lost its entry.
         return "chosen" if provenance == "chosen" else "missing-entry"
+    if message:
+        return "under-margin"  # no ratio could be formed: never pass through None == None
     if achieved is not None and required is not None and achieved < required:
         return "under-margin"
     if reason and required is not None and required < floor:
@@ -225,8 +256,9 @@ def _rule_row(rid: str, rule: "RuleField", process: "Process", evidence: Evidenc
     single = bool(binding) and len({e.source for e in binding}) == 1
     if rule.kind == "topology":
         # A named check with a hand-written fixture: no value, so no margin.
-        return Row(**common, single_source=single, margin_required=None,
-                   margin_achieved=None, status="missing-entry" if missing else "exempt")
+        return Row(**common | {"bound": None}, single_source=False, margin_required=None,
+                   margin_achieved=None, status="missing-entry" if missing else "exempt",
+                   compared=False)
     if rule.kind == "exact-size":
         # Cut sizes are exempt from the margin and equal the largest public exact size.
         if missing:
@@ -239,46 +271,50 @@ def _rule_row(rid: str, rule: "RuleField", process: "Process", evidence: Evidenc
                    margin_achieved=None, status=status)
     computed, single = _computed_margin(binding, maximum)
     required = rule.margin if rule.margin_reason and rule.margin is not None else computed
-    value = rule.value - sum((_field_value(process, p) for p in rule.composed_of if "/" not in p),
-                             Decimal(0))
-    achieved = None
-    if bound is not None and value > 0:
-        achieved = achieved_ratio(bound, value) if maximum else achieved_ratio(value, bound)
+    parts = [p for p in rule.composed_of if "/" not in p]
+    value = rule.value - sum((_field_value(process, p) for p in parts), Decimal(0))
+    achieved, message = None, ""
+    if bound is not None:
+        if parts and value <= 0:
+            message = (f"value {rule.value} minus {', '.join(parts)} leaves {value}, "
+                       "not positive")
+        else:
+            achieved, message = _ratio(bound, value) if maximum else _ratio(value, bound)
     status = _status(
         missing=missing, provenance=rule.provenance, has_bound=bound is not None,
         achieved=achieved, required=required, reason=rule.margin_reason,
         floor=MAXIMUM_MARGIN if maximum else MINIMUM_MARGIN, recorded=rule.margin_achieved,
-        implied=rule.implied_by is not None)
+        implied=rule.implied_by is not None, message=message)
     return Row(**common, single_source=single, margin_required=required,
-               margin_achieved=achieved, status=status)
+               margin_achieved=achieved, status=status, message=message)
 
 
-def _range_rows(path: str, fld: "Field", evidence: Evidence) -> list[Row]:
-    """The `.min` and `.max` rows of a range field. Cited values are compared as magnitudes
-    (`vt_p` is stored as a magnitude, the card's `vth0` is negative)."""
+def _range_rows(path: str, fld: "Field", evidence: Evidence,
+                magnitude: bool = False) -> list[Row]:
+    """The `.min` and `.max` rows of a range field. With `magnitude` the cited values are
+    compared as magnitudes (`vt_p` is stored as one, the card's `vth0` is negative)."""
     cited, missing = _resolve(fld.evidence, evidence)
     binding = [e for e in cited if _binding(e)]
     computed, single = _computed_margin(binding, maximum=False)
     required = fld.margin if fld.margin_reason and fld.margin is not None else computed
-    values = [abs(e.value) for e in binding]
+    values = [abs(e.value) if magnitude else e.value for e in binding]
     rows = []
     for end, value, bound, recorded in (
             ("min", fld.range.min, min(values, default=None), fld.margin_achieved_min),
             ("max", fld.range.max, max(values, default=None), fld.margin_achieved_max)):
-        achieved = None
-        if bound is not None and value > 0:
-            achieved = (achieved_ratio(bound, value) if end == "min"
-                        else achieved_ratio(value, bound))
+        achieved, message = None, ""
+        if bound is not None:
+            achieved, message = _ratio(bound, value) if end == "min" else _ratio(value, bound)
         status = _status(
             missing=missing, provenance=fld.provenance, has_bound=bound is not None,
             achieved=achieved, required=required, reason=fld.margin_reason,
-            floor=MINIMUM_MARGIN, recorded=recorded, implied=False)
+            floor=MINIMUM_MARGIN, recorded=recorded, implied=False, message=message)
         rows.append(Row(
             field=f"{path}.{end}", section="stack", value=value, unit=fld.unit,
             kind=f"range-{end}", cited=cited, informative=[e for e in cited if e.guideline],
             missing=missing, bound=bound, single_source=single, margin_required=required,
             margin_achieved=achieved, recorded=recorded, margin_reason=fld.margin_reason,
-            status=status))
+            status=status, message=message))
     return rows
 
 
@@ -296,24 +332,34 @@ def _field_value(process: "Process", path: str) -> Decimal:
     return value
 
 
-def _cited_ids(obj: object) -> set[str]:
-    """Every evidence id cited anywhere in the process description: the `evidence` lists and
-    the entry ids of `composed_of` of every field, rule and stack table."""
-    ids: set[str] = set()
+def _citations(obj: object, path: str = "") -> dict[str, list[str]]:
+    """Every evidence id cited anywhere in the process description (the `evidence` lists
+    and the entry ids of `composed_of`), with the full dotted paths of the fields citing it
+    (`rules.co.in`, `stack.oxides.5v0.thickness`, `grid`)."""
+    found: dict[str, list[str]] = {}
+
+    def add(more: dict[str, list[str]]) -> None:
+        for eid, paths in more.items():
+            found.setdefault(eid, [])
+            found[eid] += [p for p in paths if p not in found[eid]]
+
+    def join(key: str) -> str:
+        return f"{path}.{key}" if path else key
+
     if isinstance(obj, BaseModel):
         for name in type(obj).model_fields:
             value = getattr(obj, name)
             if name in ("evidence", "composed_of") and isinstance(value, list):
-                ids |= {v for v in value if isinstance(v, str) and "/" in v}
+                add({v: [path] for v in value if isinstance(v, str) and "/" in v})
             else:
-                ids |= _cited_ids(value)
+                add(_citations(value, join(name)))
     elif isinstance(obj, dict):
-        for value in obj.values():
-            ids |= _cited_ids(value)
+        for key, value in obj.items():
+            add(_citations(value, join(str(key))))
     elif isinstance(obj, (list, tuple)):
         for value in obj:
-            ids |= _cited_ids(value)
-    return ids
+            add(_citations(value, path))
+    return found
 
 
 # --- output
@@ -349,18 +395,21 @@ def _row_line(row: Row) -> str:
     if row.status == "achieved-mismatch":
         achieved += f" (recorded {_dec(row.recorded) or 'none'})"
     status = f"**{row.status}**" if row.status in FAILING else row.status
+    if row.message:
+        status += f" ({_cell(row.message)})"
     return (f"| `{row.field}` | {value} | {row.kind} | {_dec(row.bound)} "
             f"| {_dec(row.margin_required)} | {achieved} | {status} | {cited} "
             f"| {_ids(row.informative)} | {_cell(row.margin_reason)} |")
 
 
-def _entry_table(entries: list[Entry]) -> list[str]:
+def _entry_table(entries: list[Entry], notes: dict[str, str]) -> list[str]:
     lines = []
     for kind in sorted({e.kind for e in entries}):
         group = [e for e in entries if e.kind == kind]
-        lines += ["", f"### {kind} ({len(group)})", "", "| id | value | text |", "|---|---|---|"]
-        lines += [f"| `{e.id}` | {_dec(e.value)} {e.unit or ''} | {_cell(e.text)} |"
-                  for e in group]
+        lines += ["", f"### {kind} ({len(group)})", "", "| id | value | text | note |",
+                  "|---|---|---|---|"]
+        lines += [f"| `{e.id}` | {_dec(e.value)} {e.unit or ''} | {_cell(e.text)} "
+                  f"| {notes.get(e.id, '')} |" for e in group]
     return lines
 
 
@@ -385,11 +434,11 @@ def _markdown(report: Report) -> str:
                f"multiple of every one: {_yes(report.grid_ok)}.")]
     lines += ["", "## Uncovered binding entries", "",
               f"{len(report.in_scope)} binding entries that no field cites, by kind."]
-    lines += _entry_table(report.in_scope)
+    lines += _entry_table(report.in_scope, report.notes)
     lines += ["", f"## Uncovered, {OUT_OF_SCOPE}", "",
               (f"{len(report.out_of_scope)} binding entries of the 3.3 V (`3v3`, `lv`) and "
                "6 V (`6v`) columns that no field cites, by kind.")]
-    lines += _entry_table(report.out_of_scope)
+    lines += _entry_table(report.out_of_scope, report.notes)
     lines += ["", "## Sources", "", "| id | title | status | entries | cited | retrieved |",
               "|---|---|---|---|---|---|"]
     for s in report.sources:
@@ -400,10 +449,10 @@ def _markdown(report: Report) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _entry_json(entry: Entry) -> dict:
+def _entry_json(entry: Entry, notes: dict[str, str]) -> dict:
     return {"id": entry.id, "source": entry.source, "kind": entry.kind, "column": entry.column,
             "value": _dec(entry.value) or None, "unit": entry.unit,
-            "guideline": entry.guideline, "text": entry.text}
+            "guideline": entry.guideline, "text": entry.text, "note": notes.get(entry.id, "")}
 
 
 def _json(report: Report) -> dict:
@@ -421,12 +470,13 @@ def _json(report: Report) -> dict:
             "margin_required": _dec(r.margin_required) or None,
             "margin_achieved": _dec(r.margin_achieved) or None,
             "margin_recorded": _dec(r.recorded) or None,
-            "margin_reason": r.margin_reason, "status": r.status,
+            "margin_reason": r.margin_reason, "status": r.status, "message": r.message,
+            "compared": r.compared,
             "cited": [e.id for e in r.cited if not e.guideline],
             "informative": [e.id for e in r.informative], "missing": r.missing,
         } for r in report.rows],
-        "uncovered": [_entry_json(e) for e in report.in_scope],
-        "out_of_scope": [_entry_json(e) for e in report.out_of_scope],
+        "uncovered": [_entry_json(e, report.notes) for e in report.in_scope],
+        "out_of_scope": [_entry_json(e, report.notes) for e in report.out_of_scope],
         "sources": [{
             "id": s.id, "title": s.title, "transcribed": s.transcribed,
             "retrieved": s.retrieved.isoformat() if s.retrieved else None,
@@ -437,8 +487,11 @@ def _json(report: Report) -> dict:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """`ws180g-evidence-report [--markdown PATH] [--json PATH]`: print the summary and the
-    failing rows; exit 1 when the report is not ok."""
+    """`ws180g-evidence-report [--markdown PATH] [--json PATH] [--process DIR]
+    [--evidence DIR]`: check the process description in `--process` (default
+    `process/data/ws180g`) against the evidence set in `--evidence` (default `evidence/data`),
+    write the Markdown and JSON reports where asked, print the summary and the failing rows,
+    and exit 1 when the report is not ok."""
     from ws180g_process.load import DEFAULT_DATA as PROCESS_DATA
     from ws180g_process.load import load_process
 
@@ -464,6 +517,7 @@ def main(argv: list[str] | None = None) -> int:
     for row in report.rows:
         if row.status in FAILING:
             missing = f", missing {', '.join(row.missing)}" if row.missing else ""
+            missing += f"; {row.message}" if row.message else ""
             print(f"  {row.field}: {row.status} (value {_dec(row.value)}, bound "
                   f"{_dec(row.bound) or '-'}, required {_dec(row.margin_required) or '-'}, "
                   f"achieved {_dec(row.margin_achieved) or '-'}, recorded "

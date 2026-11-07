@@ -33,6 +33,32 @@ through the Magic technology in one Magic session (cache in `tmp/magic-fixtures/
 Both engines: `uv run pytest tests/rules/test_engines_agree.py -rs -v` checks that KLayout and Magic report the
 same rule ids on every fixture of a two-engine rule, and prints each recorded `MAGIC_EXCEPTIONS` case.
 
+## Pre-commit checks
+
+Two checkers guard every commit:
+
+- `uv run ws180g-check-private [--cached] [ROOT]` enforces the public-sources rule (design document,
+  section 13): every evidence entry names a registered source with a `url` and
+  `public = true`; every process field has an allowed `provenance` and cites only evidence ids
+  that exist; every vendored file under `evidence/sources/` matches its registered sha256; and
+  no git-tracked text file outside `tmp/` contains a marker word of private material (the
+  pattern list is fixed in `build/src/ws180g_build/private_check.py`). The few lines that must
+  mention such material, such as the design document's own rule, are listed in
+  `build/private-allow.txt` as `<path glob>: <exact line text>`, each with a comment saying
+  why; an entry exempts only that exact line, and an entry that matches nothing is a finding.
+- `uv run ws180g-check-names [ROOT]` checks library, cell, corner and device names.
+
+Both print one finding per line and exit 1 when there are any. `--cached` makes the private
+check read the staged blobs (index) instead of the working tree, so a line staged with
+`git add -p` and then edited away, or a staged file deleted from the working tree, is still
+checked. Install the git hook once per clone with `tools/install-hooks`, run from the main
+checkout (it refuses a linked worktree, since the hooks directory is shared): it symlinks
+`tools/git-hooks/*` into `git rev-parse --git-path hooks`, honouring `core.hooksPath`. The
+hook runs `ws180g-check-private --cached` and `ws180g-check-names` on the repository being
+committed and refuses the commit on a finding. It runs them with `uv run --project
+"$WS180G_PROJECT"`, default the repository root; the tests set `WS180G_PROJECT` to check a
+scratch repository with the workspace's code.
+
 ## Container image
 
 Every heavy EDA job (KLayout DRC, Magic, netgen, ngspice) runs in one pinned container image

@@ -25,6 +25,8 @@ docs = ["sphinx", "myst-parser", "furo"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--strict-markers --basetemp=tmp/pytest"
+# pytest skips directories named `build` by default, which would drop tests/build/.
+norecursedirs = [".*", "*.egg", "_darcs", "CVS", "dist", "node_modules", "venv", "{arch}", "tmp"]
 markers = [
     "sandbox: runs a tool in the container through build/sandbox-run (needs Docker)",
     "slow: minutes, not seconds",

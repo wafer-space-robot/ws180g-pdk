@@ -97,3 +97,30 @@ public = true
 "69_Device_List_184.csv" = "42e2d55ecfa1a471078a80de7932ab876eb252271b242334d0ba52e5ddd99a5b"
 "70_not_coded_rules_187.csv" = "11ade9eda921014d44af273a12e4e226138ad04d9a1cd51332b62c8c9a34ed89"
 "LICENSE" = "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+
+[sources.scmos8]
+title = "MOSIS Scalable CMOS (SCMOS) Design Rules, revision 8.00 (UCSB ECE 224A mirror)"
+url = "https://bears.ece.ucsb.edu/class/ece224a/scmos/scmos-main.html"
+licence = "see README: not redistributed"
+retrieved = 2026-11-07
+transcribed = true
+vendored = false
+public = true
+
+[sources.scmos8.sha256]
+"active" = "faf1ca9e5b4de2a71849877cdae64137424bd205a8cbcd2ba15eef50cd170523"
+"contact" = "fd1251417b739346777976f55dc59f4977d0c9a46f9e937c621686ab6fc792fd"
+"dnw" = "669b38f73a72af615576ed0e7471c2b6c197c58c83fe91e9330f997f8981f543"
+"glass" = "81d530968fddc37324666f211602ee797496eaab20c044b2f54e24b9205ade02"
+"main" = "f5fbe666cb20b53e794f7bf7a4a373b6a54a4087f1bfa09d65bc14bd77fd3d23"
+"metal1" = "44046510c8bd8be78e767f3a02438e83f7f8feff87425272d384a76971241960"
+"metal2" = "a42519165f62601874a7cbe19c65eca37c971a00cb5e505ed4afd013561e2612"
+"metal3" = "05912c6fc946d5b07d718fe7ce0f409a575a2cba9d49fcfa8efb2df8a45c5ae3"
+"metal4" = "c7d0ca387bc5245e5a72a1efa142196c2fefc8e861702e3f3874dc97910b5191"
+"metal5" = "76f9b8c68116828a8e8e354f3acd505e37a91f8a26995f8a493c328fdc87f493"
+"metal6" = "fbacbc93816c59f58755f2e7c04700653c35ac3af01f545d55b65c9397204b07"
+"poly" = "c698ba89dfa92077edf4211e07c6b3f2362eaa9824d591174865309fd63bb6c7"
+"sblock" = "23f0379452669226b2cd614d470bef9655021754fc645f9c16aa0121535f6a8a"
+"select" = "99dc4b5d0b708c1b0774a11d0f6e3f5d14e369fa019ed851e2827cc3ef659182"
+"thick-active" = "eba44f6483e1fc15b4fa6fde6f92ec27004c26a90e13954f29e161a1751ac143"
+"well" = "35d1c3d5c9d93c6a75ead2d5767836e649ec3321d8ef1b67bf51a2d12283b11b"

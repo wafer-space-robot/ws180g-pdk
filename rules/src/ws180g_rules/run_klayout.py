@@ -10,7 +10,8 @@
    `<rule>__<case>.gds`: flat and unique, since the batch deck names its reports by basename
    and refuses repeats);
 3. looks each one up in `out_dir/cache/<key>.json`, where the key is the SHA-256 of the deck
-   files and the derived layout's bytes (`cache_key`);
+   files, the derived layout's bytes and the container image ID (`cache_key`; `image_id`
+   defaults to `docker/IMAGE_ID`, so a rebuilt image misses the cache);
 4. for the misses only, writes `out_dir/list.txt` (container paths) and starts **one**
    `klayout -b -r /work/out/deck/<variant>_batch.drc -rd list=... -rd out=/work/out/reports`
    through `runner(cmd, workdir=out_dir)`, which must mount `out_dir` at `/work/out`
@@ -39,7 +40,9 @@ from ws180g_process.model import Process
 CONTAINER_OUT = "/work/out"
 #: Part of every cache key; bump it when the meaning of a cached result changes (the parser,
 #: the result fields), so old entries are not reused.
-CACHE_VERSION = b"ws180g-run-klayout 1\n"
+CACHE_VERSION = b"ws180g-run-klayout 2\n"
+#: The image ID (`sha256:...`) the runner's container must have: line 1 of this file.
+IMAGE_ID_FILE = Path(__file__).resolve().parents[3] / "docker" / "IMAGE_ID"
 
 Runner = Callable[[list[str], Path], subprocess.CompletedProcess]
 
@@ -84,9 +87,19 @@ def parse_lyrdb(path: Path) -> DrcResult:
     return DrcResult(violations=dict(counts), categories_run=len(names))
 
 
-def cache_key(deck_files: list[Path], derived: Path) -> str:
-    """SHA-256 of the deck files (by name, in name order) and the derived layout's bytes."""
+def read_image_id(path: Path = IMAGE_ID_FILE) -> str:
+    """The pinned container image ID: the first word of `docker/IMAGE_ID`."""
+    words = path.read_text(encoding="utf-8").split()
+    if not words or not words[0].startswith("sha256:"):
+        raise ValueError(f"{path}: no sha256 image ID")
+    return words[0]
+
+
+def cache_key(deck_files: list[Path], derived: Path, image_id: str) -> str:
+    """SHA-256 of the deck files (by name, in name order), the derived layout's bytes and
+    the image ID the engine runs in."""
     h = hashlib.sha256(CACHE_VERSION)
+    h.update(f"image {image_id}\n".encode())
     for path in sorted(deck_files, key=lambda p: p.name):
         data = path.read_bytes()
         h.update(f"deck {path.name} {len(data)}\n".encode())
@@ -116,9 +129,11 @@ def _deck(deck_dir: Path) -> tuple[str, list[Path]]:
 
 
 def run_klayout_many(deck_dir: Path, gds_files: list[Path], out_dir: Path, runner: Runner,
-                     process: Process) -> DrcResults:
+                     process: Process, image_id: str | None = None) -> DrcResults:
     """Run every layout of `gds_files` through the deck in `deck_dir` (one engine process
-    for all cache misses) and return their results; see the module docstring."""
+    for all cache misses) and return their results; see the module docstring. `image_id`
+    is the container image the runner uses (default: `docker/IMAGE_ID`)."""
+    image_id = image_id or read_image_id()
     variant, sources = _deck(deck_dir)
     names = [derived_name(g) for g in gds_files]
     repeated = sorted({n for n in names if names.count(n) > 1})
@@ -137,7 +152,7 @@ def run_klayout_many(deck_dir: Path, gds_files: list[Path], out_dir: Path, runne
     misses: list[tuple[Path, str, Path]] = []  # (input, derived name, cache file)
     for gds, name in zip(gds_files, names, strict=True):
         derive_file(gds, derived / name, process, variant)
-        entry = cache / f"{cache_key(deck_files, derived / name)}.json"
+        entry = cache / f"{cache_key(deck_files, derived / name, image_id)}.json"
         if entry.is_file():
             results[gds] = DrcResult.from_json(entry.read_text(encoding="utf-8"))
             results.cache_hits += 1
@@ -176,6 +191,6 @@ def _ordered(results: DrcResults, gds_files: list[Path]) -> DrcResults:
 
 
 def run_klayout(deck_dir: Path, gds: Path, out_dir: Path, runner: Runner,
-                process: Process) -> DrcResult:
+                process: Process, image_id: str | None = None) -> DrcResult:
     """Run one layout through the deck (`run_klayout_many` of one input)."""
-    return run_klayout_many(deck_dir, [gds], out_dir, runner, process)[gds]
+    return run_klayout_many(deck_dir, [gds], out_dir, runner, process, image_id)[gds]

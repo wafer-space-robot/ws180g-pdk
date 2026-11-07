@@ -15,6 +15,10 @@ jobs:
       - run: uv sync --all-packages
       - run: uv run ruff check .
       - run: uv run pytest -rs -v -m "not sandbox"
+      - run: uv run ws180g-build --no-container
+      - run: uv run ws180g-check-names
+      - run: uv run ws180g-check-private
+      - run: uv run sphinx-build -W docs out/docs
 
   sandbox:
     # Manual only: the base image is about 15 GB. If the hosted runner cannot hold it, the

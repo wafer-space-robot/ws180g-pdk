@@ -6,7 +6,9 @@
 
 1. copies every retargeted input to `out_dir/gds/<parent dir>__<stem>.gds` (flat, unique);
 2. looks each one up in `out_dir/cache/<key>.json`, the key being the SHA-256 of the
-   layout's bytes, the mapping file's bytes, `metal_top` and the deck path (`cache_key`);
+   layout's bytes, the mapping actually used (`model_dump_json()`, not its file), `metal_top`,
+   the deck path and the container image ID (`cache_key`; `image_id` defaults to
+   `docker/IMAGE_ID`);
 3. for the misses only, writes `out_dir/list-<metal_top>-<k>.txt` (`jobs` shards) and starts
    **one** container, `sh -c '<loops>'`, whose `jobs` parallel loops run `klayout -b -r
    <deck>` once per listed layout (the public deck has no batch mode) with the switches of
@@ -32,20 +34,23 @@ from ws180g_rules.run_klayout import (
     Runner,
     derived_name,
     parse_lyrdb,
+    read_image_id,
 )
 
 from ws180g_precheck.mapping import Mapping
 
 #: Part of every cache key; bump it when the meaning of a cached result changes.
-CACHE_VERSION = b"ws180g-gf180mcu-drc 1\n"
+CACHE_VERSION = b"ws180g-gf180mcu-drc 2\n"
 
 
-def cache_key(gds: Path, mapping: Mapping, metal_top: str) -> str:
-    """SHA-256 of the retargeted layout, the mapping file, `metal_top` and the deck path."""
+def cache_key(gds: Path, mapping: Mapping, metal_top: str, image_id: str) -> str:
+    """SHA-256 of the retargeted layout, the mapping as used (`model_dump_json()`),
+    `metal_top`, the deck path and the image ID the deck runs in."""
     h = hashlib.sha256(CACHE_VERSION)
     for label, data in [("gds", gds.read_bytes()),
-                        ("mapping", mapping.path.read_bytes() if mapping.path else b""),
-                        ("metal_top", metal_top.encode()), ("deck", mapping.drc.deck.encode())]:
+                        ("mapping", mapping.model_dump_json().encode()),
+                        ("metal_top", metal_top.encode()), ("deck", mapping.drc.deck.encode()),
+                        ("image", image_id.encode())]:
         h.update(f"{label} {len(data)}\n".encode())
         h.update(data)
     return h.hexdigest()
@@ -74,10 +79,13 @@ def gf180mcu_command(mapping: Mapping, metal_top: str, jobs: int = 1) -> list[st
 
 
 def run_gf180mcu_drc_many(gds_files: list[Path], out_dir: Path, runner: Runner,
-                          mapping: Mapping, metal_top: str, jobs: int = 1) -> DrcResults:
+                          mapping: Mapping, metal_top: str, jobs: int = 1,
+                          image_id: str | None = None) -> DrcResults:
     """Run every retargeted layout of `gds_files` through the public deck with `metal_top`
     (one container for all cache misses, `jobs` klayout processes at a time: match it to
-    the runner's CPU cap) and return their results."""
+    the runner's CPU cap) and return their results. `image_id` is the container image the
+    runner uses (default: `docker/IMAGE_ID`)."""
+    image_id = image_id or read_image_id()
     if jobs < 1:
         raise ValueError(f"jobs must be at least 1: {jobs}")
     if metal_top not in mapping.drc.metal_top:
@@ -94,7 +102,7 @@ def run_gf180mcu_drc_many(gds_files: list[Path], out_dir: Path, runner: Runner,
     misses: list[tuple[Path, str, Path]] = []
     for gds, name in zip(gds_files, names, strict=True):
         shutil.copyfile(gds, gds_dir / name)
-        entry = cache / f"{cache_key(gds_dir / name, mapping, metal_top)}.json"
+        entry = cache / f"{cache_key(gds_dir / name, mapping, metal_top, image_id)}.json"
         if entry.is_file():
             results[gds] = DrcResult.from_json(entry.read_text(encoding="utf-8"))
             results.cache_hits += 1

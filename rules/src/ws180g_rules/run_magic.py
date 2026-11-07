@@ -9,7 +9,8 @@
 2. derives the generated layers of every input with `ws180g_layergen.derive_file` into
    `out_dir/derived/<parent dir>__<stem>.gds` (`run_klayout.derived_name`);
 3. looks each one up in `out_dir/cache/<key>.json`, where the key is the SHA-256 of the two
-   technology files and the derived layout's bytes (`cache_key`);
+   technology files, the derived layout's bytes, `BOX_GROW` and the container image ID
+   (`cache_key`; `image_id` defaults to `docker/IMAGE_ID`);
 4. for the misses only, copies each derived layout to `out_dir/magic/c_<NNNN>.gds` with its
    cells renamed to `c_<NNNN>` (the top cell) and `c_<NNNN>_<k>`: every fixture's top cell is
    `test`, and one Magic session cannot hold two cells of one name (`out_dir/magic/names.txt`
@@ -17,12 +18,17 @@
    `out_dir/script.tcl` and starts **one**
    `magic -dnull -noconsole -rcfile /work/out/tech/<variant>.magicrc < /work/out/script.tcl`
    through `runner(cmd, workdir=out_dir)`, which must mount `out_dir` at `/work/out`;
-5. per layout the script does `gds read`, `load`, `select top cell`, grows the box by 20 um
-   (`drc listall why` lists only the errors under the box, and an error area can lie just
-   outside the cell's bounding box), `drc check`, `drc catchup`, and writes
-   `out_dir/results/c_<NNNN>.txt`: `total <drc list count total>`, one line per entry of
-   `drc listall why` (its number of error tiles, then the why string), and `end`;
-6. parses each result (`parse_why`), caches it and returns `{input: DrcResult}`.
+5. per layout the script does `gds read`, `load`, `select top cell`, records the box (the
+   cell's bounding box), grows it by 20 um (`drc listall why` lists only the errors under
+   the box, and an error area can lie just outside the cell's bounding box), `drc check`,
+   `drc catchup`, and writes `out_dir/results/c_<NNNN>.txt`: `cell <name>`, `bbox <box>`,
+   `total <drc list count total>`, one line per entry of `drc listall why` (its number of
+   error tiles, then the why string), and `end`;
+6. fails when `magic.log` has a line with `Error`, `Unknown layer` or `couldn't be read`
+   (Magic reports a Tcl or GDS problem there and carries on: a silent error);
+7. parses each result (`parse_why`), which fails on a missing `total` line, a result of
+   another cell, or an empty cell (Magic's box `0 0 1 1`), caches it and returns
+   `{input: DrcResult}`.
 
 The rule id of an error is the text before the first `": "` of its why string (the technology
 writes every why as `"<rule id>: ..."`); a why string without one (a Magic built-in error)
@@ -44,13 +50,20 @@ import klayout.db as kdb
 from ws180g_layergen.derive import derive_file
 from ws180g_process.model import Process
 
-from ws180g_rules.run_klayout import DrcResult, DrcResults, Runner, _ordered, derived_name
+from ws180g_rules.run_klayout import (
+    DrcResult,
+    DrcResults,
+    Runner,
+    _ordered,
+    derived_name,
+    read_image_id,
+)
 
 #: Where the runner mounts `out_dir` in the container.
 CONTAINER_OUT = "/work/out"
 #: Part of every cache key; bump it when the meaning of a cached result changes (the script,
 #: the parser, the result fields), so old entries are not reused.
-CACHE_VERSION = b"ws180g-run-magic 1\n"
+CACHE_VERSION = b"ws180g-run-magic 3\n"
 #: How far the box is grown beyond the cell's bounding box before `drc listall why`, in
 #: internal units (nm).
 BOX_GROW = 20000
@@ -58,18 +71,36 @@ BOX_GROW = 20000
 _WHY_ID = re.compile(r'"([A-Za-z0-9_.]+): ')
 _TILES = re.compile(r"^(\d+) (.*)$")
 _RULE_ID = re.compile(r"^([A-Za-z0-9_.]+): ")
+#: Lines of `magic.log` that mean the session went wrong although Magic carried on.
+LOG_ERROR = re.compile(r"\bError\b|Unknown layer|couldn't be read")
+#: The box Magic gives a cell with nothing in it.
+EMPTY_BOX = "0 0 1 1"
 
 
-def parse_why(text: str, categories_run: int) -> DrcResult:
-    """A result file of the script (`total N`, `<tiles> <why>` lines, `end`): error tiles
-    summed per rule id. Raises `ValueError` without the closing `end` (a session that died
-    part way) or on a line of another form."""
+def parse_why(text: str, categories_run: int, cell: str | None = None) -> DrcResult:
+    """A result file of the script (`cell`, `bbox`, `total N`, `<tiles> <why>` lines,
+    `end`): error tiles summed per rule id. Raises `ValueError` without the closing `end` (a
+    session that died part way), without the `total` line, or on a line of another form.
+    With `cell`, the `cell` line must name it and the `bbox` line must be that of a
+    non-empty cell."""
     lines = text.splitlines()
     if not lines or lines[-1] != "end":
         raise ValueError("Magic result does not finish with 'end' (truncated)")
+    header = {k: line.split(" ", 1)[1].strip() for line in lines[:-1]
+              for k in ("cell", "bbox", "total") if line.startswith(f"{k} ")}
+    if "total" not in header:
+        raise ValueError("Magic result has no 'total' line (the script did not get there)")
+    if cell is not None:
+        if header.get("cell") != cell:
+            raise ValueError(f"Magic result is for cell {header.get('cell')!r}, not {cell}")
+        if "bbox" not in header:
+            raise ValueError("Magic result has no 'bbox' line")
+        box = header["bbox"].split()
+        if header["bbox"] == EMPTY_BOX or len(box) != 4 or box[0] == box[2] or box[1] == box[3]:
+            raise ValueError(f"cell {cell} is empty (bbox {header['bbox']}): it was not read")
     counts: Counter[str] = Counter()
     for line in lines[:-1]:
-        if line.startswith("total "):
+        if line.startswith(("total ", "cell ", "bbox ")):
             continue
         match = _TILES.match(line)
         if match is None:
@@ -88,9 +119,11 @@ def magic_rule_ids(tech: str) -> set[str]:
     return set(_WHY_ID.findall("\n".join(rules)))
 
 
-def cache_key(tech_files: list[Path], derived: Path) -> str:
-    """SHA-256 of the technology files (by name, in name order) and the derived layout."""
+def cache_key(tech_files: list[Path], derived: Path, image_id: str) -> str:
+    """SHA-256 of the technology files (by name, in name order), the derived layout, the
+    box growth of the script (`BOX_GROW`) and the image ID the engine runs in."""
     h = hashlib.sha256(CACHE_VERSION)
+    h.update(f"image {image_id}\nbox_grow {BOX_GROW}\n".encode())
     for path in sorted(tech_files, key=lambda p: p.name):
         data = path.read_bytes()
         h.update(f"tech {path.name} {len(data)}\n".encode())
@@ -134,8 +167,10 @@ def magic_script(cells: list[str]) -> str:
     for cell in cells:
         result = f"{CONTAINER_OUT}/results/{cell}.txt"
         lines += [f"gds read {CONTAINER_OUT}/magic/{cell}.gds", f"load {cell}",
-                  "select top cell", f"box grow c {BOX_GROW}", "drc check", "drc catchup",
+                  "select top cell", "set bbox [box values]", f"box grow c {BOX_GROW}",
+                  "drc check", "drc catchup",
                   f"set f [open {result} w]",
+                  'puts $f "cell [cellname list self]"', 'puts $f "bbox $bbox"',
                   'puts $f "total [drc list count total]"',
                   'foreach {why boxes} [drc listall why] { puts $f "[llength $boxes] $why" }',
                   'puts $f "end"', "close $f"]
@@ -143,9 +178,11 @@ def magic_script(cells: list[str]) -> str:
 
 
 def run_magic_many(tech_dir: Path, gds_files: list[Path], out_dir: Path, runner: Runner,
-                   process: Process) -> DrcResults:
+                   process: Process, image_id: str | None = None) -> DrcResults:
     """Run every layout of `gds_files` through the Magic technology in `tech_dir` (one Magic
-    session for all cache misses) and return their results; see the module docstring."""
+    session for all cache misses) and return their results; see the module docstring.
+    `image_id` is the container image the runner uses (default: `docker/IMAGE_ID`)."""
+    image_id = image_id or read_image_id()
     variant, sources = _tech(tech_dir)
     names = [derived_name(g) for g in gds_files]
     repeated = sorted({n for n in names if names.count(n) > 1})
@@ -166,7 +203,7 @@ def run_magic_many(tech_dir: Path, gds_files: list[Path], out_dir: Path, runner:
     misses: list[tuple[Path, str, Path]] = []  # (input, derived name, cache file)
     for gds, name in zip(gds_files, names, strict=True):
         derive_file(gds, derived / name, process, variant)
-        entry = cache / f"{cache_key(tech_files, derived / name)}.json"
+        entry = cache / f"{cache_key(tech_files, derived / name, image_id)}.json"
         if entry.is_file():
             results[gds] = DrcResult.from_json(entry.read_text(encoding="utf-8"))
             results.cache_hits += 1
@@ -186,17 +223,25 @@ def run_magic_many(tech_dir: Path, gds_files: list[Path], out_dir: Path, runner:
     cmd = ["sh", "-c", (f"magic -dnull -noconsole -rcfile {CONTAINER_OUT}/tech/{variant}.magicrc"
                         f" < {CONTAINER_OUT}/script.tcl")]
     done = runner(cmd, out_dir)
-    (out_dir / "magic.log").write_text(done.stdout + done.stderr, encoding="utf-8")
+    log = out_dir / "magic.log"
+    log.write_text(done.stdout + done.stderr, encoding="utf-8")
     if done.returncode != 0:
         raise RuntimeError(f"magic exit {done.returncode}:\n{done.stdout[-4000:]}"
                            f"\n{done.stderr[-4000:]}")
+    errors = [line for line in (done.stdout + done.stderr).splitlines() if LOG_ERROR.search(line)]
+    if errors:
+        raise RuntimeError(f"magic reported {len(errors)} error line(s) in {log}: "
+                           + "; ".join(errors[:5]))
     parsed = []
     for (gds, _, entry), cell in zip(misses, cells, strict=True):
         result = results_dir / f"{cell}.txt"
         if not result.is_file():
-            raise RuntimeError(f"magic wrote no result for {gds} ({result}); see "
-                               f"{out_dir / 'magic.log'}")
-        parsed.append((gds, entry, parse_why(result.read_text(encoding="utf-8"), categories)))
+            raise RuntimeError(f"magic wrote no result for {gds} ({result}); see {log}")
+        try:
+            parsed.append((gds, entry, parse_why(result.read_text(encoding="utf-8"),
+                                                 categories, cell)))
+        except ValueError as exc:
+            raise RuntimeError(f"magic result for {gds} ({result}): {exc}; see {log}") from exc
     for gds, entry, result in parsed:
         entry.write_text(result.to_json(), encoding="utf-8")
         results[gds] = result
@@ -204,6 +249,6 @@ def run_magic_many(tech_dir: Path, gds_files: list[Path], out_dir: Path, runner:
 
 
 def run_magic(tech_dir: Path, gds: Path, out_dir: Path, runner: Runner,
-              process: Process) -> DrcResult:
+              process: Process, image_id: str | None = None) -> DrcResult:
     """Run one layout through the Magic technology (`run_magic_many` of one input)."""
-    return run_magic_many(tech_dir, [gds], out_dir, runner, process)[gds]
+    return run_magic_many(tech_dir, [gds], out_dir, runner, process, image_id)[gds]

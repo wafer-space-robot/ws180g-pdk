@@ -161,6 +161,10 @@ sheet, registered, not yet transcribed, 0 entries; plan decision 13).
   result from the cache (`tmp/t23/build2.log`); `diff -r tmp/t23/out tmp/t23/out2`
   printed nothing and exited 0 (`tmp/t23/diff-out-out2.log`): the two output trees,
   manifest included, are byte-identical.
+- Clean rerun at the report's commit: `uv run ws180g-build --out tmp/t23/out3` exit 0
+  (`tmp/t23/build3.log`), manifest `"git_commit": "4e7169764be493f5c8708ca73889b34f35e0cd4d"`,
+  `"git_dirty": false` (`tmp/t23/build3-manifest.log`); `diff -r tmp/t23/out2 tmp/t23/out3`
+  differs only in those two manifest fields (`tmp/t23/diff-out2-out3.log`).
 
 ## CI
 
@@ -340,7 +344,7 @@ On a Linux host with Docker (about 30 GB free for the images), from a clone:
 ```sh
 git clone https://github.com/wafer-space-robot/ws180g-pdk.git
 cd ws180g-pdk
-git checkout d284382      # the commit of these runs; or main
+git checkout 4e71697      # the commit of the clean rerun; or main
 uv sync --all-packages
 docker/build                    # the image; prints sha256:2fe8eb94..., equal to docker/IMAGE_ID
 mkdir -p tmp/t23

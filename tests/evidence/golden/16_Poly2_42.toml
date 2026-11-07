@@ -1,0 +1,522 @@
+# SPDX-License-Identifier: Apache-2.0
+# The expected import of evidence/sources/gf180mcu-drm/16_Poly2_42.csv, written by hand from
+# the CSV. Columns 3.3V, 5V, 6V; PL.2 splits n/p; PL.3a has two lines (a, b); PL.3b and PL.10
+# are guidelines (trailing *); PL.6, PL.9 and PL.11 hold no value; PL.8 takes 14 % from its
+# description; PL.12 has a value only in the 5V column.
+
+[[entry]]
+id = "gf180mcu-drm/PL.1/3v3"
+source = "gf180mcu-drm"
+rule = "PL.1"
+column = "3v3"
+kind = "min-width"
+layers = []
+value = 0.18
+unit = "um"
+text = "Interconnect Width (outside PLFUSE)"
+cite = "16_Poly2_42.csv, row PL.1, column 3v3"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PL.1/5v"
+source = "gf180mcu-drm"
+rule = "PL.1"
+column = "5v"
+kind = "min-width"
+layers = []
+value = 0.2
+unit = "um"
+text = "Interconnect Width (outside PLFUSE)"
+cite = "16_Poly2_42.csv, row PL.1, column 5v"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PL.1/6v"
+source = "gf180mcu-drm"
+rule = "PL.1"
+column = "6v"
+kind = "min-width"
+layers = []
+value = 0.2
+unit = "um"
+text = "Interconnect Width (outside PLFUSE)"
+cite = "16_Poly2_42.csv, row PL.1, column 6v"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PL.1a/3v3"
+source = "gf180mcu-drm"
+rule = "PL.1a"
+column = "3v3"
+kind = "min-width"
+layers = []
+value = 0.18
+unit = "um"
+text = "Interconnect Width (inside PLFUSE)"
+cite = "16_Poly2_42.csv, row PL.1a, column 3v3"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PL.1a/5v"
+source = "gf180mcu-drm"
+rule = "PL.1a"
+column = "5v"
+kind = "min-width"
+layers = []
+value = 0.18
+unit = "um"
+text = "Interconnect Width (inside PLFUSE)"
+cite = "16_Poly2_42.csv, row PL.1a, column 5v"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PL.1a/6v"
+source = "gf180mcu-drm"
+rule = "PL.1a"
+column = "6v"
+kind = "min-width"
+layers = []
+value = 0.18
+unit = "um"
+text = "Interconnect Width (inside PLFUSE)"
+cite = "16_Poly2_42.csv, row PL.1a, column 6v"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PL.2/3v3"
+source = "gf180mcu-drm"
+rule = "PL.2"
+column = "3v3"
+kind = "min-width"
+layers = []
+value = 0.28
+unit = "um"
+text = "Gate Width (Channel Length) 1"
+cite = "16_Poly2_42.csv, row PL.2, column 3v3"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PL.2/5v/n"
+source = "gf180mcu-drm"
+rule = "PL.2"
+column = "5v"
+part = "n"
+kind = "min-width"
+layers = []
+value = 0.6
+unit = "um"
+text = "Gate Width (Channel Length) 1"
+cite = "16_Poly2_42.csv, row PL.2, column 5v"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PL.2/5v/p"
+source = "gf180mcu-drm"
+rule = "PL.2"
+column = "5v"
+part = "p"
+kind = "min-width"
+layers = []
+value = 0.5
+unit = "um"
+text = "Gate Width (Channel Length) 1"
+cite = "16_Poly2_42.csv, row PL.2, column 5v"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PL.2/6v/n"
+source = "gf180mcu-drm"
+rule = "PL.2"
+column = "6v"
+part = "n"
+kind = "min-width"
+layers = []
+value = 0.7
+unit = "um"
+text = "Gate Width (Channel Length) 1"
+cite = "16_Poly2_42.csv, row PL.2, column 6v"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PL.2/6v/p"
+source = "gf180mcu-drm"
+rule = "PL.2"
+column = "6v"
+part = "p"
+kind = "min-width"
+layers = []
+value = 0.55
+unit = "um"
+text = "Gate Width (Channel Length) 1"
+cite = "16_Poly2_42.csv, row PL.2, column 6v"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PL.3a/3v3/a"
+source = "gf180mcu-drm"
+rule = "PL.3a"
+column = "3v3"
+part = "a"
+kind = "min-space"
+layers = []
+value = 0.24
+unit = "um"
+text = "Space on COMP Space on Field"
+cite = "16_Poly2_42.csv, row PL.3a, column 3v3"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PL.3a/3v3/b"
+source = "gf180mcu-drm"
+rule = "PL.3a"
+column = "3v3"
+part = "b"
+kind = "min-space"
+layers = []
+value = 0.24
+unit = "um"
+text = "Space on COMP Space on Field"
+cite = "16_Poly2_42.csv, row PL.3a, column 3v3"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PL.3a/5v/a"
+source = "gf180mcu-drm"
+rule = "PL.3a"
+column = "5v"
+part = "a"
+kind = "min-space"
+layers = []
+value = 0.24
+unit = "um"
+text = "Space on COMP Space on Field"
+cite = "16_Poly2_42.csv, row PL.3a, column 5v"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PL.3a/5v/b"
+source = "gf180mcu-drm"
+rule = "PL.3a"
+column = "5v"
+part = "b"
+kind = "min-space"
+layers = []
+value = 0.24
+unit = "um"
+text = "Space on COMP Space on Field"
+cite = "16_Poly2_42.csv, row PL.3a, column 5v"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PL.3a/6v/a"
+source = "gf180mcu-drm"
+rule = "PL.3a"
+column = "6v"
+part = "a"
+kind = "min-space"
+layers = []
+value = 0.24
+unit = "um"
+text = "Space on COMP Space on Field"
+cite = "16_Poly2_42.csv, row PL.3a, column 6v"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PL.3a/6v/b"
+source = "gf180mcu-drm"
+rule = "PL.3a"
+column = "6v"
+part = "b"
+kind = "min-space"
+layers = []
+value = 0.24
+unit = "um"
+text = "Space on COMP Space on Field"
+cite = "16_Poly2_42.csv, row PL.3a, column 6v"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PL.3b/3v3"
+source = "gf180mcu-drm"
+rule = "PL.3b"
+column = "3v3"
+kind = "min-space"
+layers = []
+value = 0.26
+unit = "um"
+text = "Poly2 Space on COMP for low active sheet resistivity (guideline)"
+cite = "16_Poly2_42.csv, row PL.3b, column 3v3"
+guideline = true
+
+[[entry]]
+id = "gf180mcu-drm/PL.3b/5v"
+source = "gf180mcu-drm"
+rule = "PL.3b"
+column = "5v"
+kind = "min-space"
+layers = []
+value = 0.4
+unit = "um"
+text = "Poly2 Space on COMP for low active sheet resistivity (guideline)"
+cite = "16_Poly2_42.csv, row PL.3b, column 5v"
+guideline = true
+
+[[entry]]
+id = "gf180mcu-drm/PL.3b/6v"
+source = "gf180mcu-drm"
+rule = "PL.3b"
+column = "6v"
+kind = "min-space"
+layers = []
+value = 0.4
+unit = "um"
+text = "Poly2 Space on COMP for low active sheet resistivity (guideline)"
+cite = "16_Poly2_42.csv, row PL.3b, column 6v"
+guideline = true
+
+[[entry]]
+id = "gf180mcu-drm/PL.4/3v3"
+source = "gf180mcu-drm"
+rule = "PL.4"
+column = "3v3"
+kind = "min-extension"
+layers = []
+value = 0.22
+unit = "um"
+text = "Extension beyond COMP to form Poly2 end cap"
+cite = "16_Poly2_42.csv, row PL.4, column 3v3"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PL.4/5v"
+source = "gf180mcu-drm"
+rule = "PL.4"
+column = "5v"
+kind = "min-extension"
+layers = []
+value = 0.22
+unit = "um"
+text = "Extension beyond COMP to form Poly2 end cap"
+cite = "16_Poly2_42.csv, row PL.4, column 5v"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PL.4/6v"
+source = "gf180mcu-drm"
+rule = "PL.4"
+column = "6v"
+kind = "min-extension"
+layers = []
+value = 0.22
+unit = "um"
+text = "Extension beyond COMP to form Poly2 end cap"
+cite = "16_Poly2_42.csv, row PL.4, column 6v"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PL.5a/3v3"
+source = "gf180mcu-drm"
+rule = "PL.5a"
+column = "3v3"
+kind = "min-space"
+layers = []
+value = 0.1
+unit = "um"
+text = "Space from field Poly2 to unrelated COMP Spacer from field Poly2 to Guard-ring"
+cite = "16_Poly2_42.csv, row PL.5a, column 3v3"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PL.5a/5v"
+source = "gf180mcu-drm"
+rule = "PL.5a"
+column = "5v"
+kind = "min-space"
+layers = []
+value = 0.3
+unit = "um"
+text = "Space from field Poly2 to unrelated COMP Spacer from field Poly2 to Guard-ring"
+cite = "16_Poly2_42.csv, row PL.5a, column 5v"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PL.5a/6v"
+source = "gf180mcu-drm"
+rule = "PL.5a"
+column = "6v"
+kind = "min-space"
+layers = []
+value = 0.3
+unit = "um"
+text = "Space from field Poly2 to unrelated COMP Spacer from field Poly2 to Guard-ring"
+cite = "16_Poly2_42.csv, row PL.5a, column 6v"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PL.5b/3v3"
+source = "gf180mcu-drm"
+rule = "PL.5b"
+column = "3v3"
+kind = "min-space"
+layers = []
+value = 0.1
+unit = "um"
+text = "Space from field Poly2 to related COMP"
+cite = "16_Poly2_42.csv, row PL.5b, column 3v3"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PL.5b/5v"
+source = "gf180mcu-drm"
+rule = "PL.5b"
+column = "5v"
+kind = "min-space"
+layers = []
+value = 0.3
+unit = "um"
+text = "Space from field Poly2 to related COMP"
+cite = "16_Poly2_42.csv, row PL.5b, column 5v"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PL.5b/6v"
+source = "gf180mcu-drm"
+rule = "PL.5b"
+column = "6v"
+kind = "min-space"
+layers = []
+value = 0.3
+unit = "um"
+text = "Space from field Poly2 to related COMP"
+cite = "16_Poly2_42.csv, row PL.5b, column 6v"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PL.7/3v3"
+source = "gf180mcu-drm"
+rule = "PL.7"
+column = "3v3"
+kind = "min-width"
+layers = []
+value = 0.3
+unit = "um"
+text = "45 deg bent gate width"
+cite = "16_Poly2_42.csv, row PL.7, column 3v3"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PL.7/5v"
+source = "gf180mcu-drm"
+rule = "PL.7"
+column = "5v"
+kind = "min-width"
+layers = []
+value = 0.7
+unit = "um"
+text = "45 deg bent gate width"
+cite = "16_Poly2_42.csv, row PL.7, column 5v"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PL.7/6v"
+source = "gf180mcu-drm"
+rule = "PL.7"
+column = "6v"
+kind = "min-width"
+layers = []
+value = 0.7
+unit = "um"
+text = "45 deg bent gate width"
+cite = "16_Poly2_42.csv, row PL.7, column 6v"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PL.8/3v3"
+source = "gf180mcu-drm"
+rule = "PL.8"
+column = "3v3"
+kind = "density-floor"
+layers = []
+value = 14
+unit = "%"
+text = "Poly2 coverage over the entire die shall be >= 14% Dummy poly2 lines must be added to meet the minimum poly2 density requirement."
+cite = "16_Poly2_42.csv, row PL.8, column 3v3"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PL.8/5v"
+source = "gf180mcu-drm"
+rule = "PL.8"
+column = "5v"
+kind = "density-floor"
+layers = []
+value = 14
+unit = "%"
+text = "Poly2 coverage over the entire die shall be >= 14% Dummy poly2 lines must be added to meet the minimum poly2 density requirement."
+cite = "16_Poly2_42.csv, row PL.8, column 5v"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PL.8/6v"
+source = "gf180mcu-drm"
+rule = "PL.8"
+column = "6v"
+kind = "density-floor"
+layers = []
+value = 14
+unit = "%"
+text = "Poly2 coverage over the entire die shall be >= 14% Dummy poly2 lines must be added to meet the minimum poly2 density requirement."
+cite = "16_Poly2_42.csv, row PL.8, column 6v"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PL.10/3v3"
+source = "gf180mcu-drm"
+rule = "PL.10"
+column = "3v3"
+kind = "density-ceiling"
+layers = []
+value = 1
+unit = "mA/um"
+text = "Maximum Poly2 current density"
+cite = "16_Poly2_42.csv, row PL.10, column 3v3"
+guideline = true
+
+[[entry]]
+id = "gf180mcu-drm/PL.10/5v"
+source = "gf180mcu-drm"
+rule = "PL.10"
+column = "5v"
+kind = "density-ceiling"
+layers = []
+value = 1
+unit = "mA/um"
+text = "Maximum Poly2 current density"
+cite = "16_Poly2_42.csv, row PL.10, column 5v"
+guideline = true
+
+[[entry]]
+id = "gf180mcu-drm/PL.10/6v"
+source = "gf180mcu-drm"
+rule = "PL.10"
+column = "6v"
+kind = "density-ceiling"
+layers = []
+value = 1
+unit = "mA/um"
+text = "Maximum Poly2 current density"
+cite = "16_Poly2_42.csv, row PL.10, column 6v"
+guideline = true
+
+[[entry]]
+id = "gf180mcu-drm/PL.12/5v"
+source = "gf180mcu-drm"
+rule = "PL.12"
+column = "5v"
+kind = "min-enclosure"
+layers = []
+value = 0
+unit = "um"
+text = "V5_Xtor enclose 5V Comp"
+cite = "16_Poly2_42.csv, row PL.12, column 5v"
+guideline = false

@@ -18,6 +18,10 @@ ws180g-tech = { workspace = true }
 ws180g-precheck = { workspace = true }
 ws180g-build = { workspace = true }
 
+[tool.uv]
+# `uv run` and `uv sync` install the documentation tools too (CI builds the docs).
+default-groups = ["dev", "docs"]
+
 [dependency-groups]
 dev = ["pytest>=9", "ruff", "pydantic>=2.11", "klayout>=0.30.12"]
 docs = ["sphinx", "myst-parser", "furo"]

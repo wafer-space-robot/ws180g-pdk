@@ -971,13 +971,21 @@ version = "0.0.0"
 source = { editable = "build" }
 dependencies = [
     { name = "pydantic" },
+    { name = "ws180g-evidence" },
+    { name = "ws180g-precheck" },
     { name = "ws180g-process" },
+    { name = "ws180g-rules" },
+    { name = "ws180g-tech" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "pydantic", specifier = ">=2.11" },
+    { name = "ws180g-evidence", editable = "evidence" },
+    { name = "ws180g-precheck", editable = "precheck" },
     { name = "ws180g-process", editable = "process" },
+    { name = "ws180g-rules", editable = "rules" },
+    { name = "ws180g-tech", editable = "tech" },
 ]
 
 [[package]]

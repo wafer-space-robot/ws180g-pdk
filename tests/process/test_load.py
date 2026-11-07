@@ -84,3 +84,10 @@ def test_a_missing_file_does_not_hide_schema_errors(data_copy):
     lines = _lines(data_copy)
     assert any(line.startswith("masks.toml: ") for line in lines)
     assert any(line.startswith("process.toml: grid.provenance:") for line in lines)
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf")])
+def test_rejects_a_non_finite_grid(data_copy, value):
+    set_toml(data_copy / "process.toml", ["grid", "value"], value)
+    with pytest.raises(ProcessError, match="grid.value"):
+        load_process(data_copy)

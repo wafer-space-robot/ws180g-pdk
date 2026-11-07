@@ -177,7 +177,10 @@ def _check_grid(grid: object) -> list[ProcessError]:
 
 
 def _is_number(value: object) -> bool:
-    return isinstance(value, (Decimal, int)) and not isinstance(value, bool)
+    """A finite Decimal or a non-bool int; NaN and infinity are left to the schema error."""
+    if isinstance(value, Decimal):
+        return value.is_finite()
+    return isinstance(value, int) and not isinstance(value, bool)
 
 
 def _check_variants(variants: dict[str, Variant], known: set[str]) -> list[ProcessError]:

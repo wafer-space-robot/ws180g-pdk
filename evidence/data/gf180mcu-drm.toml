@@ -3101,7 +3101,7 @@ rule = "HRES.11"
 kind = "density-ceiling"
 layers = []
 value = 1
-unit = "um"
+unit = "mA/um"
 text = "Maximum current density of Poly2 resistor (mA/um)"
 cite = "33_ANALOG_DEVICE3_84.csv, row HRES.11, column -"
 guideline = true
@@ -3849,8 +3849,8 @@ rule = "LRES.8"
 kind = "density-ceiling"
 layers = []
 value = 1
-unit = "um"
-text = "Maximum current density of Poly2 resistor (mA/m)"
+unit = "mA/um"
+text = "Maximum current density of Poly2 resistor (mA/m) [unit printed as (mA/m) with a Symbol-font micro sign U+F06D or none; read as mA/um as in 70_not_coded_rules_187.csv row LRES.8]"
 cite = "33_ANALOG_DEVICE2_82.csv, row LRES.8, column -"
 guideline = true
 
@@ -7849,6 +7849,66 @@ cite = "16_Poly2_42.csv, row PL.12, column 5v"
 guideline = false
 
 [[entry]]
+id = "gf180mcu-drm/PM.1"
+source = "gf180mcu-drm"
+rule = "PM.1"
+kind = "min-enclosure"
+layers = []
+value = 0
+unit = "um"
+text = "Min PROBE_MK overlap of probe pad passivation opening"
+cite = "32_Probe_pad_79.csv, row PM.1, column -"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PM.2"
+source = "gf180mcu-drm"
+rule = "PM.2"
+kind = "other"
+layers = []
+value = 50
+unit = "um"
+text = "Min probe pad passivation opening1"
+cite = "32_Probe_pad_79.csv, row PM.2, column -"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PM.3"
+source = "gf180mcu-drm"
+rule = "PM.3"
+kind = "other"
+layers = []
+value = 80
+unit = "um"
+text = "Min probe pad pitch1"
+cite = "32_Probe_pad_79.csv, row PM.3, column -"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PM.4"
+source = "gf180mcu-drm"
+rule = "PM.4"
+kind = "min-enclosure"
+layers = []
+value = 2
+unit = "um"
+text = "Min Probe pad top layer metal overlap of pad opening"
+cite = "32_Probe_pad_79.csv, row PM.4, column -"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/PM.5"
+source = "gf180mcu-drm"
+rule = "PM.5"
+kind = "other"
+layers = []
+value = 13
+unit = "um"
+text = "Min Probe pad passivation opening to solder bump UBM opening"
+cite = "32_Probe_pad_79.csv, row PM.5, column -"
+guideline = false
+
+[[entry]]
 id = "gf180mcu-drm/PP.1"
 source = "gf180mcu-drm"
 rule = "PP.1"
@@ -8223,7 +8283,7 @@ rule = "PRES.8"
 kind = "density-ceiling"
 layers = []
 value = 1
-unit = "um"
+unit = "mA/um"
 text = "Maximum current density of Poly2 resistor (mA/um)"
 cite = "33_ANALOG_DEVICE1_80.csv, row PRES.8, column -"
 guideline = true
@@ -8790,6 +8850,78 @@ value = 3.0
 unit = "um"
 text = "Top metal thickness of metal stack option 1P2M, TM30K"
 cite = "05_Current_0.18_MCU_9.csv, row TM30K, column -"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/TM.1a"
+source = "gf180mcu-drm"
+rule = "TM.1a"
+kind = "other"
+layers = []
+value = 40
+unit = "um"
+text = "Min Passivation Opening"
+cite = "31_Top_Metal_76.csv, row TM.1a, column -"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/TM.2a"
+source = "gf180mcu-drm"
+rule = "TM.2a"
+kind = "other"
+layers = []
+value = 60
+unit = "um"
+text = "Min UBM Opening (defined by the layers UBMPPeri or UBMPArray or UBMEPlate layers depending upon the process)"
+cite = "31_Top_Metal_76.csv, row TM.2a, column -"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/TM.3a"
+source = "gf180mcu-drm"
+rule = "TM.3a"
+kind = "other"
+layers = []
+value = 72
+unit = "um"
+text = "Min Bump Pad"
+cite = "31_Top_Metal_76.csv, row TM.3a, column -"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/TM.4"
+source = "gf180mcu-drm"
+rule = "TM.4"
+kind = "min-space"
+layers = []
+value = 90
+unit = "um"
+text = "Space from centre of Pad to Die Edge (Outer edge of GUARD_RING_MK marking)"
+cite = "31_Top_Metal_76.csv, row TM.4, column -"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/TM.8"
+source = "gf180mcu-drm"
+rule = "TM.8"
+kind = "min-space"
+layers = []
+value = 2
+unit = "um"
+text = "Space from edge of top via to the edge of UBM opening"
+cite = "31_Top_Metal_76.csv, row TM.8, column -"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-drm/TM.10"
+source = "gf180mcu-drm"
+rule = "TM.10"
+kind = "min-space"
+layers = []
+value = 2
+unit = "um"
+text = "Space from edge of top via to the edge of passivation opening"
+cite = "31_Top_Metal_76.csv, row TM.10, column -"
 guideline = false
 
 [[entry]]

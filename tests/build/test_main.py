@@ -155,3 +155,90 @@ def test_sphinx_builds_without_warnings(built, tmp):
     assert done.returncode == 0, done.stdout[-4000:] + done.stderr[-4000:]
     assert "nw.w" in (tmp / "html" / "rules.html").read_text(encoding="utf-8")
     assert "PL.8" in (tmp / "html" / "evidence.html").read_text(encoding="utf-8")
+
+
+# --- the container half with the engine runners replaced (no container)
+
+
+class FakeEngines:
+    """Stands in for the three runners: every fixture gives exactly the expected markers,
+    except the ids in `wrong`, which give one `x.y` marker."""
+
+    def __init__(self, monkeypatch, wrong: set[str] = frozenset()) -> None:
+        from ws180g_rules.run_klayout import DrcResult, DrcResults
+
+        self.calls: list[str] = []
+        self.wrong = wrong
+        self.by_path: dict[Path, object] = {}
+
+        def results(name, paths, expected):
+            self.calls.append(name)
+            out = DrcResults()
+            for p in paths:
+                got = expected(p)
+                if p.parent.name + "/" + p.stem in self.wrong:
+                    got = {"x.y": 1}
+                out[p] = DrcResult(violations=got, categories_run=5)
+            return out
+
+        def klayout(deck, paths, work, runner, process, image_id):
+            assert image_id.startswith("sha256:")
+            return results("klayout", paths, lambda p: self.by_path[p].markers())
+
+        def magic(tech, paths, work, runner, process, image_id):
+            from ws180g_tech.magic import magic_markers
+
+            return results("magic", paths,
+                           lambda p: dict.fromkeys(magic_markers(self.by_path[p]), 1))
+
+        def gf180mcu(paths, work, runner, mapping, metal_top, jobs, image_id):
+            return results(f"gf180mcu {metal_top}", paths, lambda p: {})
+
+        monkeypatch.setattr("ws180g_rules.run_klayout.run_klayout_many", klayout)
+        monkeypatch.setattr("ws180g_rules.run_magic.run_magic_many", magic)
+        monkeypatch.setattr("ws180g_precheck.gf180mcu.run_gf180mcu_drc_many", gf180mcu)
+
+
+@pytest.fixture
+def staged(process, tmp):
+    from ws180g_rules.fixtures import write_fixtures
+    from ws180g_rules.klayout_deck import write_klayout_deck
+    from ws180g_rules.table import RuleTable
+    from ws180g_tech.magic import write_magic_tech
+
+    table = RuleTable.from_process(process)
+    generated = tmp / "generated"
+    write_klayout_deck(table, process, generated / "drc")
+    write_magic_tech(table, process, VARIANT, generated / "magic")
+    return table, generated, write_fixtures(table, process, generated / "fixtures")
+
+
+def _run(engines, staged, process, tmp):
+    from ws180g_build.main import run_engines
+
+    table, generated, fixtures = staged
+    engines.by_path = {f.path: f for f in fixtures}
+    run_engines(table, process, fixtures, generated, tmp / "reports", tmp / "work",
+                runner=None, image_id="sha256:" + "1" * 64, log=lambda m: None)
+
+
+def test_container_runs_report_and_pass(monkeypatch, staged, process, tmp):
+    engines = FakeEngines(monkeypatch)
+    _run(engines, staged, process, tmp)
+    assert engines.calls == ["klayout", "magic", "gf180mcu 9K", "gf180mcu 11K",
+                             "gf180mcu 30K"]
+    for name in ("klayout-fixtures", "magic-fixtures", "gf180mcu-gate"):
+        report = json.loads((tmp / "reports" / f"{name}.json").read_text(encoding="utf-8"))
+        if name == "gf180mcu-gate":
+            assert all(r["dirty"] == {} for r in report["runs"].values())
+            assert "dnw.w/min" in report["excluded"]
+        else:
+            assert report["wrong"] == {} and report["fixtures"] > 0
+
+
+def test_container_run_with_a_wrong_fixture_fails(monkeypatch, staged, process, tmp):
+    engines = FakeEngines(monkeypatch, wrong={"nw.w/pass_min"})
+    with pytest.raises(BuildError, match="nw.w/pass_min"):
+        _run(engines, staged, process, tmp)
+    report = json.loads((tmp / "reports" / "klayout-fixtures.json").read_text(encoding="utf-8"))
+    assert report["wrong"]["nw.w/pass_min"] == {"expected": {}, "got": {"x.y": 1}}

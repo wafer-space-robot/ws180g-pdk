@@ -6,10 +6,10 @@ item records the public file it was read from in its `source`. `load_mapping(pat
 it strictly (`extra="forbid"`): a misspelt key is an error, not a silent default.
 """
 
+import tomllib
 from decimal import Decimal
 from pathlib import Path
 
-import tomllib
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 
 DATA = Path(__file__).resolve().parents[2] / "data"

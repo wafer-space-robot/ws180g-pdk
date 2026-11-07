@@ -1,3 +1,189 @@
 # SPDX-License-Identifier: Apache-2.0
-# Filled in Tasks 3 and 7.
-[stack]
+# The process stack. Task 3 writes the schema tables and placeholders; Task 7 fills
+# `oxides` and `metals` and the evidence-bearing ranges once the evidence exists.
+# Fields absent here (a thickness, a doping, a registration value) are unknown, not zero.
+
+[stack.oxides]
+
+[stack.metals]
+
+[stack.dielectrics.ild1]
+note = "no public thickness data; placeholder"
+
+[stack.dielectrics.ild2]
+note = "no public thickness data; placeholder"
+
+[stack.dielectrics.ild3]
+note = "no public thickness data; placeholder"
+
+[stack.dielectrics.ild4]
+note = "no public thickness data; placeholder"
+
+[stack.dielectrics.imd_top]
+note = "no public thickness data; placeholder"
+
+[stack.dielectrics.passivation]
+note = "no public thickness data; placeholder"
+
+[stack.implants.nplus]
+note = "no public doping data; placeholder"
+
+[stack.implants.pplus]
+note = "no public doping data; placeholder"
+
+[stack.implants.vt_5v0]
+note = "no public doping data; placeholder"
+
+# Each entry names the rule fields of its minimum feature and space (Task 7 adds them).
+# nd and pd share the diffusion rules `df`; cuts have a fixed `size`.
+
+[stack.litho.nw]
+min_feature = "rules.nw.w"
+min_space = "rules.nw.s"
+
+[stack.litho.nw.registration]
+unit = "um"
+provenance = "chosen"
+note = "no public overlay data; placeholder until a public source or silicon"
+
+[stack.litho.nd]
+min_feature = "rules.df.w"
+min_space = "rules.df.s"
+
+[stack.litho.nd.registration]
+unit = "um"
+provenance = "chosen"
+note = "no public overlay data; placeholder until a public source or silicon"
+
+[stack.litho.pd]
+min_feature = "rules.df.w"
+min_space = "rules.df.s"
+
+[stack.litho.pd.registration]
+unit = "um"
+provenance = "chosen"
+note = "no public overlay data; placeholder until a public source or silicon"
+
+[stack.litho.po]
+min_feature = "rules.po.w"
+min_space = "rules.po.s"
+
+[stack.litho.po.registration]
+unit = "um"
+provenance = "chosen"
+note = "no public overlay data; placeholder until a public source or silicon"
+
+[stack.litho.co]
+min_feature = "rules.co.size"
+min_space = "rules.co.s"
+
+[stack.litho.co.registration]
+unit = "um"
+provenance = "chosen"
+note = "no public overlay data; placeholder until a public source or silicon"
+
+[stack.litho.m1]
+min_feature = "rules.m1.w"
+min_space = "rules.m1.s"
+
+[stack.litho.m1.registration]
+unit = "um"
+provenance = "chosen"
+note = "no public overlay data; placeholder until a public source or silicon"
+
+[stack.litho.v1]
+min_feature = "rules.v1.size"
+min_space = "rules.v1.s"
+
+[stack.litho.v1.registration]
+unit = "um"
+provenance = "chosen"
+note = "no public overlay data; placeholder until a public source or silicon"
+
+[stack.litho.m2]
+min_feature = "rules.m2.w"
+min_space = "rules.m2.s"
+
+[stack.litho.m2.registration]
+unit = "um"
+provenance = "chosen"
+note = "no public overlay data; placeholder until a public source or silicon"
+
+[stack.litho.v2]
+min_feature = "rules.v2.size"
+min_space = "rules.v2.s"
+
+[stack.litho.v2.registration]
+unit = "um"
+provenance = "chosen"
+note = "no public overlay data; placeholder until a public source or silicon"
+
+[stack.litho.m3]
+min_feature = "rules.m3.w"
+min_space = "rules.m3.s"
+
+[stack.litho.m3.registration]
+unit = "um"
+provenance = "chosen"
+note = "no public overlay data; placeholder until a public source or silicon"
+
+[stack.litho.v3]
+min_feature = "rules.v3.size"
+min_space = "rules.v3.s"
+
+[stack.litho.v3.registration]
+unit = "um"
+provenance = "chosen"
+note = "no public overlay data; placeholder until a public source or silicon"
+
+[stack.litho.m4]
+min_feature = "rules.m4.w"
+min_space = "rules.m4.s"
+
+[stack.litho.m4.registration]
+unit = "um"
+provenance = "chosen"
+note = "no public overlay data; placeholder until a public source or silicon"
+
+[stack.litho.v4]
+min_feature = "rules.v4.size"
+min_space = "rules.v4.s"
+
+[stack.litho.v4.registration]
+unit = "um"
+provenance = "chosen"
+note = "no public overlay data; placeholder until a public source or silicon"
+
+[stack.litho.mtop]
+min_feature = "rules.mtop.w"
+min_space = "rules.mtop.s"
+
+[stack.litho.mtop.registration]
+unit = "um"
+provenance = "chosen"
+note = "no public overlay data; placeholder until a public source or silicon"
+
+[stack.litho.pad]
+min_feature = "rules.pad.w"
+min_space = "rules.pad.s"
+
+[stack.litho.pad.registration]
+unit = "um"
+provenance = "chosen"
+note = "no public overlay data; placeholder until a public source or silicon"
+
+[stack.litho.sab]
+min_feature = "rules.sab.w"
+min_space = "rules.sab.s"
+
+[stack.litho.sab.registration]
+unit = "um"
+provenance = "chosen"
+note = "no public overlay data; placeholder until a public source or silicon"
+
+[stack.supplies.5v0]
+nominal = 5.0
+tolerance = 0.10
+unit = "V"
+provenance = "chosen"
+note = "+/-10 %, the corners ss_125C_4v50 and ff_n40C_5v50 of spec section 6.2"

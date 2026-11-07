@@ -23,6 +23,11 @@ uv run ruff check .
 
 Run `pytest` from the repository root: the basetemp (`tmp/pytest`) is relative to the invocation directory.
 
+Gate check 1, KLayout half: `uv run pytest tests/rules/test_klayout_fixtures.py -rs -v` (needs the container
+image) runs every per-rule fixture through the KLayout deck in one container run and checks each
+against its expected markers. Results are cached in `tmp/klayout-fixtures/run/cache/` by the bytes of
+the deck and the layout; delete `tmp/klayout-fixtures/` to force a fresh engine run (about 4 minutes).
+
 ## Container image
 
 Every heavy EDA job (KLayout DRC, Magic, netgen, ngspice) runs in one pinned container image

@@ -40,16 +40,19 @@ SKIPPED [21] tests/rules/test_engines_agree.py:23: KLayout-only
 ========== 745 passed, 42 skipped, 1 deselected in 270.58s (0:04:30) ===========
 ```
 
-Per file (counted from the same log, `tmp/t23/gate1-counts.log`):
+Per file, counted from the same log by test id with `uv run tools/pytest_log_counts.py
+tmp/t23/gate1.log` (`tmp/t23/gate1-counts.log`; no `FAILED` line):
 
 | Test file | Passed | Skipped | Failed |
 |---|---|---|---|
 | `test_klayout_fixtures.py` (261 fixtures and 3 deck tests) | 264 | 0 | 0 |
 | `test_magic_fixtures.py` | 241 | 21 | 0 |
-| `test_engines_agree.py` | 237 | 21 | 0 |
+| `test_engines_agree.py` | 240 | 21 | 0 |
+
+264 + 241 + 240 = 745, the summary line's count.
 
 Every skip has the reason `KLayout-only`. The 21 skipped fixtures per Magic file belong to the
-eight KLayout-only rules: `angle` 2, `co.s.butt` 3, `cut.ortho` 2, `grid` 3,
+eight KLayout-only rules (`tmp/t23/gate1-skips-by-rule.log`): `angle` 2, `co.s.butt` 3, `cut.ortho` 2, `grid` 3,
 `mtop.v4.array` 3, `mtop.w.long` 4, `nw.tap.dmax` 2, `ps.tap.dmax` 2. (The final Phase 0
 review counted 20; the fix wave added the pass fixture `grid/pass_grid_45`.) The agreement
 test printed the three recorded `MAGIC_EXCEPTIONS` cases (`po.x.df/fail_end_inside`,
@@ -183,8 +186,9 @@ SKIPPED [21] tests/rules/test_magic_fixtures.py:46: KLayout-only
 ======== 1232 passed, 42 skipped, 524 deselected in 1219.69s (0:20:19) =========
 ```
 
-which includes gates 1 and 2 (264 KLayout, 241 Magic and 237 agreement tests, 456
-retarget cases, 3 positive controls, the IO run). The `host` job of the same run also
+which includes gates 1 and 2 (264 KLayout, 241 Magic and 240 agreement tests, 456
+retarget cases, 3 positive controls, the IO run; counted by test id in
+`tmp/t23/ci-sandbox-counts.log`). The `host` job of the same run also
 passed. So the hosted runner can run the sandbox job, and gate checks 1 and 2 now have
 a second, independent run.
 

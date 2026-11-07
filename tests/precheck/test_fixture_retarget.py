@@ -6,8 +6,9 @@ Collection only computes the case ids (from the rule table, writing nothing), so
 run (`-m "not sandbox"`) never touches a gate run's files. The session fixtures write the
 pass fixtures into `tmp/gf180mcu-retarget/fixtures/` (with the regression fixtures of
 `tests/precheck/regressions/`), retarget them into `tmp/gf180mcu-retarget/retargeted/` and
-run them: one container per `metal_top` value. Results are cached by the retargeted bytes, the mapping file, `metal_top` and the deck
-path; delete `tmp/gf180mcu-retarget/run/` to force fresh runs. A fixture excluded under
+run them: one container per `metal_top` value. Results are cached by the retargeted bytes,
+the mapping as used, `metal_top`, the deck path and the image ID; delete
+`tmp/gf180mcu-retarget/run/` to force fresh runs. A fixture excluded under
 policy (c) of `docs/phase-0-retarget-log.md` is listed in `EXCLUDED` with its GF rule and
 reason. A summary of every run is written to `tmp/gf180mcu-retarget/reports/gate.json`."""
 

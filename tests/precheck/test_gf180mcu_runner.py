@@ -5,7 +5,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from ws180g_precheck.gf180mcu import gf180mcu_command, run_gf180mcu_drc_many
+from ws180g_precheck.gf180mcu import cache_key, gf180mcu_command, run_gf180mcu_drc_many
 from ws180g_precheck.mapping import load_mapping
 
 MAPPING = load_mapping()
@@ -129,3 +129,31 @@ def test_failed_run_caches_nothing(tmp):
             run_gf180mcu_drc_many(inputs, tmp / "run", runner, MAPPING, "9K")
     assert len(runner.calls) == 2
     assert list((tmp / "run" / "cache").glob("*.json")) == []
+
+
+def test_cache_key_hashes_the_mapping_used_and_the_image(tmp):
+    gds = _inputs(tmp)[0]
+    image = "sha256:" + "1" * 64
+    key = cache_key(gds, MAPPING, "9K", image)
+    assert cache_key(gds, MAPPING, "9K", image) == key
+    # a mapping changed in memory (its file unchanged) is another key
+    changed = MAPPING.model_copy(update={"metal_level": "6LM"})
+    assert changed.path == MAPPING.path
+    assert cache_key(gds, changed, "9K", image) != key
+    # so is another image
+    assert cache_key(gds, MAPPING, "9K", "sha256:" + "2" * 64) != key
+
+
+def test_changed_mapping_or_image_misses_the_cache(tmp):
+    inputs = _inputs(tmp)
+    runner = FakeRunner(dirty=set())
+    run_gf180mcu_drc_many(inputs, tmp / "run", runner, MAPPING, "9K")
+    assert run_gf180mcu_drc_many(inputs, tmp / "run", runner, MAPPING, "9K").cache_hits == 2
+    assert len(runner.calls) == 1
+    changed = MAPPING.model_copy(
+        update={"drc": MAPPING.drc.model_copy(update={"workers": MAPPING.drc.workers + 1})})
+    again = run_gf180mcu_drc_many(inputs, tmp / "run", runner, changed, "9K")
+    assert again.cache_hits == 0 and len(runner.calls) == 2
+    other = run_gf180mcu_drc_many(inputs, tmp / "run", runner, MAPPING, "9K",
+                                  image_id="sha256:" + "3" * 64)
+    assert other.cache_hits == 0 and len(runner.calls) == 3

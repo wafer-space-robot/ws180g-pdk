@@ -253,3 +253,18 @@ def test_expected_markers(fixtures):
     assert by_key[("nw.w", "pass", "min")].markers() == {}
     assert by_key[("nw.w", "fail", "min_minus_grid")].markers() == {"nw.w": 1}
     assert by_key[("grid", "fail", "grid")].markers() == {"grid": 2}
+
+
+def test_pass_fixture_v4_clusters_are_rectangular_arrays(fixtures, proc):
+    """Every v4 cluster of a pass fixture is a rectangular array: GF180MCU MT30.8 (30K top
+    metal) merges each cluster's cuts by 1 um over-under sizing and rejects a cluster whose
+    shape is not a rectangle (found by the Task 18 retarget check,
+    docs/phase-0-retarget-log.md)."""
+    for f in fixtures:
+        if f.expect != "pass":
+            continue
+        v4 = _layers(f.path, proc)["v4"]
+        if v4.is_empty():
+            continue
+        clusters = v4.sized(1000).merged().sized(-1000)
+        assert clusters.non_rectangles().is_empty(), (f.rule_id, f.name)

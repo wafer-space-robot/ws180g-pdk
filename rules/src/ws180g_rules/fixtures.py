@@ -330,10 +330,20 @@ def _gate_length(row: RuleRow, k: Kit) -> list[Case]:
 
 def _space_cuts(c: Cell, k: Kit, layer: str, s: int) -> None:
     if layer == "v4":
-        # P and Q at the space under test, R below P and S below Q at the minimum, R-S at
-        # the minimum: one cluster of four, so the array rule holds
+        # Above the minimum: two 2 x 2 arrays at the minimum space, side by side at the
+        # space under test (each a cluster of four for mtop.v4.array, together one
+        # rectangle for GF MT30.8). At or below it: P and Q at the space under test, R below
+        # P and S below Q, R-S at the minimum, one cluster of four (one v4.s marker when
+        # failing).
         a, smin = k.cut("v4"), k.v("v4.s")
-        for x, y in ((0, 0), (a + s, 0), (0, -(a + smin)), (a + smin, -(a + smin))):
+        rows = (0, -(a + smin))
+        if s > smin:
+            right = 2 * a + smin + s
+            columns = (0, a + smin, right, right + a + smin)
+            points = [(x, y) for x in columns for y in rows]
+        else:
+            points = [(0, 0), (a + s, 0), (0, rows[1]), (a + smin, rows[1])]
+        for x, y in points:
             c.box("v4", x, y, x + a, y + a)
         return
     base = "po" if layer == "co" else None
@@ -422,12 +432,12 @@ _SPACE_SPECIAL: dict[str, Callable[[Cell, Kit, RuleRow, int], None]] = {
 }
 
 
-def _inner(c: Cell, k: Kit, outer: str, inner: str) -> list[kdb.Box]:
+def _inner(c: Cell, k: Kit, outer: str, inner: str, shift: int = V4_SHIFT) -> list[kdb.Box]:
     """The inner shapes of an enclosure fixture, the tested one first (its right side is
     the one under test): a cut of exact size, a 2 x 2 v4 array, a minimum pad, or a 1 um
     box."""
     if inner == "v4":
-        return v4_cluster(c, k, 0, 0)
+        return v4_cluster(c, k, 0, 0, shift=shift)
     if inner in CUTS:
         base = "po" if inner == "co" and outer not in ("po", "nd", "pd") else None
         a = k.cut(inner)
@@ -445,7 +455,9 @@ def _min_enclosure(row: RuleRow, k: Kit) -> list[Case]:
     cases = []
     for expect, name, m in [*_steps(v, k.g), ("fail", "straddle", None)]:
         c = Cell()
-        boxes = _inner(c, k, outer, inner)
+        # a pass case gets an aligned v4 array (GF MT30.8 wants a rectangular array); a
+        # fail case keeps the shifted lower row, so the tested cut alone is at the margin
+        boxes = _inner(c, k, outer, inner, shift=0 if expect == "pass" else V4_SHIFT)
         bb = kdb.Box()
         for b in boxes:
             bb += b

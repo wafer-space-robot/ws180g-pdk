@@ -16,6 +16,7 @@ from ws180g_rules.run_klayout import (
     cache_key,
     derived_name,
     parse_lyrdb,
+    read_image_id,
     run_klayout,
     run_klayout_many,
 )
@@ -75,21 +76,31 @@ def _files(root: Path, deck: dict[str, bytes], gds: bytes) -> tuple[list[Path], 
     return paths, root / "x.gds"
 
 
+IMAGE = "sha256:" + "1" * 64
+
+
 def test_cache_key(tmp):
     deck = {"a.drc": b"deck", "a_checks.rb": b"checks"}
-    key = cache_key(*_files(tmp / "one", deck, b"gds"))
+    key = cache_key(*_files(tmp / "one", deck, b"gds"), IMAGE)
     assert len(key) == 64 and int(key, 16) >= 0
     # the same bytes elsewhere: the same key (the location is not part of it)
-    assert cache_key(*_files(tmp / "two", deck, b"gds")) == key
+    assert cache_key(*_files(tmp / "two", deck, b"gds"), IMAGE) == key
     # the order the deck files are given in is not part of it
     paths, gds = _files(tmp / "three", deck, b"gds")
-    assert cache_key(list(reversed(paths)), gds) == key
+    assert cache_key(list(reversed(paths)), gds, IMAGE) == key
     # any byte of the deck or the layout is
-    assert cache_key(*_files(tmp / "four", {**deck, "a.drc": b"deck2"}, b"gds")) != key
-    assert cache_key(*_files(tmp / "five", deck, b"gds2")) != key
+    assert cache_key(*_files(tmp / "four", {**deck, "a.drc": b"deck2"}, b"gds"), IMAGE) != key
+    assert cache_key(*_files(tmp / "five", deck, b"gds2"), IMAGE) != key
     # so is which deck file holds which bytes
     assert cache_key(*_files(tmp / "six", {"a.drc": b"checks", "a_checks.rb": b"deck"},
-                             b"gds")) != key
+                             b"gds"), IMAGE) != key
+    # and the image the engine runs in
+    assert cache_key(paths, gds, "sha256:" + "2" * 64) != key
+
+
+def test_image_id_reads_the_pinned_digest(repo_root):
+    pinned = (repo_root / "docker" / "IMAGE_ID").read_text(encoding="utf-8").split()[0]
+    assert read_image_id() == pinned and pinned.startswith("sha256:")
 
 
 def test_derived_name():
@@ -210,6 +221,17 @@ def test_run_many_deck_change_misses_the_cache(deck_dir, proc, inputs, tmp):
     checks.write_text(checks.read_text(encoding="utf-8") + "\n# changed\n", encoding="utf-8")
     runner = FakeRunner({})
     results = run_klayout_many(changed, inputs, out, runner, proc)
+    assert len(runner.calls) == 1 and results.cache_hits == 0
+
+
+def test_run_many_image_change_misses_the_cache(deck_dir, proc, inputs, tmp):
+    out = tmp / "work"
+    run_klayout_many(deck_dir, inputs, out, FakeRunner({}), proc)
+    runner = FakeRunner({})
+    again = run_klayout_many(deck_dir, inputs, out, runner, proc)
+    assert runner.calls == [] and again.cache_hits == 2
+    results = run_klayout_many(deck_dir, inputs, out, runner, proc,
+                               image_id="sha256:" + "3" * 64)
     assert len(runner.calls) == 1 and results.cache_hits == 0
 
 

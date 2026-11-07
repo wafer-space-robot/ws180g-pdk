@@ -32,7 +32,7 @@ the deck and the layout; delete `tmp/klayout-fixtures/` to force a fresh engine 
 
 Two checkers guard every commit:
 
-- `uv run ws180g-check-private [ROOT]` enforces the public-sources rule (design document,
+- `uv run ws180g-check-private [--cached] [ROOT]` enforces the public-sources rule (design document,
   section 13): every evidence entry names a registered source with a `url` and
   `public = true`; every process field has an allowed `provenance` and cites only evidence ids
   that exist; every vendored file under `evidence/sources/` matches its registered sha256; and
@@ -43,10 +43,16 @@ Two checkers guard every commit:
   why; an entry exempts only that exact line, and an entry that matches nothing is a finding.
 - `uv run ws180g-check-names [ROOT]` checks library, cell, corner and device names.
 
-Both print one finding per line and exit 1 when there are any. Install the git hook once per
-clone with `tools/install-hooks` (it symlinks `tools/git-hooks/*` into the hooks directory,
-which worktrees share, so run it from the primary checkout); the hook runs both checkers from
-the root of the repository being committed and refuses the commit on a finding.
+Both print one finding per line and exit 1 when there are any. `--cached` makes the private
+check read the staged blobs (index) instead of the working tree, so a line staged with
+`git add -p` and then edited away, or a staged file deleted from the working tree, is still
+checked. Install the git hook once per clone with `tools/install-hooks`, run from the main
+checkout (it refuses a linked worktree, since the hooks directory is shared): it symlinks
+`tools/git-hooks/*` into `git rev-parse --git-path hooks`, honouring `core.hooksPath`. The
+hook runs `ws180g-check-private --cached` and `ws180g-check-names` on the repository being
+committed and refuses the commit on a finding. It runs them with `uv run --project
+"$WS180G_PROJECT"`, default the repository root; the tests set `WS180G_PROJECT` to check a
+scratch repository with the workspace's code.
 
 ## Container image
 

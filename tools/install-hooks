@@ -1,12 +1,20 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
-# Symlink every hook in tools/git-hooks/ into the repository's hooks directory. Idempotent;
-# in a worktree the hooks directory is the one shared by all worktrees (git-common-dir).
-# An existing hook that is not already this symlink is left alone and reported.
+# Symlink every hook in tools/git-hooks/ into the repository's hooks directory
+# (`git rev-parse --git-path hooks`, which honours core.hooksPath). Idempotent. Runs only from
+# the main checkout: the hooks directory is shared by every worktree, and a link into a linked
+# worktree would dangle once that worktree is removed. An existing hook that is not already
+# this symlink is left alone and reported.
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-hooks="$(git -C "$repo" rev-parse --path-format=absolute --git-common-dir)/hooks"
+git_dir="$(git -C "$repo" rev-parse --absolute-git-dir)"
+common_dir="$(git -C "$repo" rev-parse --path-format=absolute --git-common-dir)"
+if [[ "$git_dir" != "$common_dir" ]]; then
+    echo "install-hooks: $repo is a linked worktree; run tools/install-hooks from the main checkout" >&2
+    exit 1
+fi
+hooks="$(git -C "$repo" rev-parse --path-format=absolute --git-path hooks)"
 mkdir -p "$hooks"
 
 status=0

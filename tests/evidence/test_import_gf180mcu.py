@@ -60,3 +60,12 @@ def test_every_vendored_table_is_registered(evidence, repo_root):
     vendored = {p.name for p in (repo_root / "evidence/sources/gf180mcu-drm").glob("*.csv")}
     assert len(vendored) == 85
     assert set(evidence.sources["gf180mcu-drm"].sha256) == vendored | {"LICENSE"}
+
+
+def test_guideline_part_of_a_multi_line_cell(gf_entries):
+    # The last item of the description ("III) ... (guideline)", "iii. ... (guideline)*")
+    # is the cell's last value; the other parts stay binding.
+    for guideline, binding in (("CO.6/d", "CO.6/c"), ("Vn.3/e", "Vn.3/d"), ("Vn.4/d", "Vn.4/c")):
+        assert gf_entries[f"gf180mcu-drm/{guideline}"].guideline is True
+        assert gf_entries[f"gf180mcu-drm/{guideline}"].value == Decimal("0.12")
+        assert gf_entries[f"gf180mcu-drm/{binding}"].guideline is False

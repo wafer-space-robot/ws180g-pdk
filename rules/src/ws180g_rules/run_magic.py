@@ -183,8 +183,8 @@ def run_magic_many(tech_dir: Path, gds_files: list[Path], out_dir: Path, runner:
     (magic / "names.txt").write_text("".join(f"{name}\n" for _, name, _ in misses),
                                      encoding="utf-8")
     (out_dir / "script.tcl").write_text(magic_script(cells), encoding="utf-8")
-    cmd = ["sh", "-c", f"magic -dnull -noconsole -rcfile {CONTAINER_OUT}/tech/{variant}.magicrc"
-           f" < {CONTAINER_OUT}/script.tcl"]
+    cmd = ["sh", "-c", (f"magic -dnull -noconsole -rcfile {CONTAINER_OUT}/tech/{variant}.magicrc"
+                        f" < {CONTAINER_OUT}/script.tcl")]
     done = runner(cmd, out_dir)
     (out_dir / "magic.log").write_text(done.stdout + done.stderr, encoding="utf-8")
     if done.returncode != 0:

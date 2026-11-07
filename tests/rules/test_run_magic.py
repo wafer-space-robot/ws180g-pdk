@@ -126,8 +126,8 @@ class FakeRunner:
 
     def __call__(self, cmd: list[str], workdir: Path) -> subprocess.CompletedProcess:
         self.calls.append((cmd, workdir))
-        assert cmd == ["sh", "-c", f"magic -dnull -noconsole -rcfile "
-                       f"{CONTAINER_OUT}/tech/ws180g005.magicrc < {CONTAINER_OUT}/script.tcl"]
+        assert cmd == ["sh", "-c", (f"magic -dnull -noconsole -rcfile {CONTAINER_OUT}/tech/"
+                                    f"ws180g005.magicrc < {CONTAINER_OUT}/script.tcl")]
         script = (workdir / "script.tcl").read_text(encoding="utf-8")
         assert script.rstrip().endswith("quit -noprompt")
         reads = READ.findall(script)

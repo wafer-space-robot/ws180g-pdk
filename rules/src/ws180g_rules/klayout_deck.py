@@ -363,15 +363,20 @@ def _v4_array(row: RuleRow, d: _Deck) -> Emitted:
     clusters = d.helper(f"{v4}_clusters", f"{cuts}.sized({_um(space / 2)}).merged",
                         f"{v4} clusters: cuts sized by half of rules.v4.s and merged, so the "
                         "cuts of an array at up to the minimum space form one cluster")
-    return (["v4 arrays: cuts of clusters with fewer than 4 cuts, or with a bbox narrower",
-             "than 2 x rules.v4.size + rules.v4.s (1.2 um) in either direction: sized by",
-             "rules.v4.s / 2, a one-cut-wide cluster spans rules.v4.size + rules.v4.s (0.84)",
-             "and a two-cut-wide one at least 2 x (rules.v4.size + rules.v4.s) (1.68), so the",
-             "threshold separates them only because of that sizing.",
-             "Approximation: cuts farther apart than rules.v4.s are separate clusters, and",
-             "an L of 4 or more cuts passes"],
+    return (["v4 arrays: cuts of clusters with fewer than 4 cuts, with a bbox narrower",
+             "than 2 x rules.v4.size + rules.v4.s (1.2 um) in either direction, or whose",
+             "shape is not a rectangle. Sized by rules.v4.s / 2, a one-cut-wide cluster spans",
+             "rules.v4.size + rules.v4.s (0.84) and a two-cut-wide one at least",
+             "2 x (rules.v4.size + rules.v4.s) (1.68), so the width threshold separates them",
+             "only because of that sizing. Every cut of a cluster is a rules.v4.size square",
+             "sized to rules.v4.size + rules.v4.s, and cuts are at least rules.v4.s apart, so",
+             "a rectangular cluster without holes is a full rows x columns array: a staggered",
+             "row, a missing cut (an L or a hole) or an odd-sized cut makes it a",
+             "non-rectangle (GF180MCU MT30.8). Cuts farther apart than rules.v4.s are",
+             "separate clusters"],
             (f"{cuts}.interacting({clusters}.interacting({cuts}, 1, 3) | "
-             f"{clusters}.with_bbox_min(nil, {_um(2 * size + space)}))"))
+             f"{clusters}.with_bbox_min(nil, {_um(2 * size + space)}) | "
+             f"{clusters}.non_rectangles)"))
 
 
 def _drawn(d: _Deck) -> str:

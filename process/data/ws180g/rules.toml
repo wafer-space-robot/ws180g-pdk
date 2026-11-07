@@ -859,7 +859,7 @@ provenance = "public-source"
 evidence = []
 fixture = "v4_array"
 engines = ["klayout"]
-note = "every v4 cluster under mtop is at least 2 x 2: GF180MCU MT30.8b \"There shall be minimum 2X2 array of vias (top vias) at one location connecting to 3um thick top metal.\" (25_Thick_MetalTop_62.csv, row MT30.8b; no value, so no evidence entry)"
+note = "every v4 cluster under mtop (cuts at up to rules.v4.s apart) is a full rectangular array of at least 2 x 2: GF180MCU MT30.8b \"There shall be minimum 2X2 array of vias (top vias) at one location connecting to 3um thick top metal.\" (25_Thick_MetalTop_62.csv, row MT30.8b; no value, so no evidence entry). The public deck (rule_decks/metaltop_30k.rb) rejects a via cluster that is not a rectangle after 1 um over-under sizing; a staggered cluster passed the earlier generic check and failed MT30.8, so the generic check also rejects non-rectangular clusters (Task 18, docs/phase-0-retarget-log.md)"
 
 # --- pad
 

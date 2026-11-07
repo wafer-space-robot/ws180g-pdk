@@ -268,3 +268,13 @@ def test_pass_fixture_v4_clusters_are_rectangular_arrays(fixtures, proc):
             continue
         clusters = v4.sized(1000).merged().sized(-1000)
         assert clusters.non_rectangles().is_empty(), (f.rule_id, f.name)
+
+
+def test_v4_array_has_a_staggered_fail_fixture(fixtures, proc):
+    """mtop.v4.array rejects a staggered 2 x 2 array (Task 18, outcome (a))."""
+    staggered = [f for f in fixtures if (f.rule_id, f.name) == ("mtop.v4.array", "staggered")]
+    assert [f.expect for f in staggered] == ["fail"]
+    v4 = _layers(staggered[0].path, proc)["v4"]
+    assert v4.count() == 4
+    s = int(proc.rules["v4.s"].value * 1000)
+    assert not v4.sized(s // 2).merged().non_rectangles().is_empty()

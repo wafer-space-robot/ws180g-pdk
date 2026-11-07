@@ -41,9 +41,15 @@ def _section(text: str, name: str) -> str:
 
 
 def _klayout_only_block(drc: str) -> str:
-    head, _, rest = drc.partition("# KLayout-only rules (not checked by Magic):\n")
+    """The comment lines after the block's heading, up to the first other line."""
+    _, _, rest = drc.partition("# KLayout-only rules (not checked by Magic):\n")
     assert rest, "no KLayout-only block"
-    return "".join(line + "\n" for line in rest.splitlines() if line.startswith("#"))
+    block = []
+    for line in rest.splitlines():
+        if not line.lstrip().startswith("#"):
+            break
+        block.append(line.strip() + "\n")
+    return "".join(block)
 
 
 def _why_ids(drc: str) -> set[str]:
@@ -91,8 +97,10 @@ def test_rules_without_engines_are_absent(tech, table):
         assert f"{rid}:" not in tech and f'"{rid}' not in tech, rid
 
 
-def test_no_extract_section(tech):
-    assert not re.search(r"^extract$", tech, re.MULTILINE)
+def test_extract_section_is_empty(tech):
+    # Magic falls back to its default technology at startup without the section; there is
+    # no extraction in Phase 0, so it is empty
+    assert _section(tech, "extract").strip() == ""
 
 
 def test_cifinput_reads_gds_in_nanometres(tech, process):
@@ -154,10 +162,13 @@ def test_every_key_of_the_table_is_mapped(table):
             assert kind.rule.startswith("KLayout-only: "), row.id
 
 
-def test_klayout_only_reasons_are_in_the_notes(table):
-    for row in table.checkable():
-        if row.engines == ["klayout"]:
-            assert row.text.strip(), row.id
+def test_cif_checks_have_their_style(tech):
+    drc = _section(tech, "drc")
+    assert re.search(r"^ *cifstyle drc$", drc, re.MULTILINE)
+    cifout = _section(tech, "cifoutput")
+    assert re.search(r"^style drc$", cifout, re.MULTILINE)
+    for name in re.findall(r"^ *cif\w+ (c_\w+)", drc, re.MULTILINE):
+        assert re.search(rf"^ *templayer {name}\b", cifout, re.MULTILINE), name
 
 
 def test_a_magic_row_that_magic_cannot_check_raises(table, process, tmp):
@@ -213,8 +224,8 @@ def _magic(sandbox, work: Path, tcl: str) -> str:
     """Run one Magic session in the container with the Tcl script `tcl` on stdin."""
     (work / "script.tcl").write_text(tcl + "\nquit -noprompt\n", encoding="utf-8")
     done = sandbox.run(
-        ["sh", "-c", f"magic -dnull -noconsole -rcfile /work/out/{VARIANT}.magicrc"
-                     " < /work/out/script.tcl"],
+        ["sh", "-c", (f"magic -dnull -noconsole -rcfile /work/out/{VARIANT}.magicrc"
+                     " < /work/out/script.tcl")],
         work, mem="2g", cpus=2)
     assert done.returncode == 0, done.stdout + done.stderr
     return done.stdout
@@ -224,8 +235,10 @@ def _drc_script(cells: list[str]) -> str:
     """Per cell: read its GDS, check it, print `COUNT <cell> <n>` and `WHY <cell> <text>`."""
     lines = []
     for cell in cells:
+        # drc listall reports the errors under the box; grow it past the cell's bounding
+        # box, which an error area may lie just outside
         lines += [f"gds read /work/out/{cell}.gds", f"load {cell}", "select top cell",
-                  "drc check", "drc catchup",
+                  "box grow c 20000", "drc check", "drc catchup",
                   f'puts "COUNT {cell} [drc list count total]"',
                   f'foreach {{why boxes}} [drc listall why] {{ puts "WHY {cell} $why" }}']
     return "\n".join(lines)
@@ -254,7 +267,7 @@ def test_magic_loads_the_technology(sandbox, work):
 def test_gds_read_builds_the_transistor_type(sandbox, work, process):
     _gds(work / "nfet.gds", process, "nfet", LEGAL_NFET)
     out = _magic(sandbox, work, "gds read /work/out/nfet.gds\nload nfet\nselect top cell\n"
-                                'puts "WHAT [what -list]"')
+                                'select area\nputs "WHAT [lindex [what -list] 0]"')
     line = re.search(r"^WHAT (.*)$", out, re.MULTILINE)
     assert line and "ntransistor" in line[1], out
 
@@ -267,3 +280,113 @@ def test_drc_passes_a_legal_transistor_and_flags_narrow_poly(sandbox, work, proc
     counts, whys = _results(out)
     assert counts.get("legal") == 0, out
     assert counts.get("narrow", 0) >= 1 and "po.w" in whys["narrow"], out
+
+
+# Probes: (boxes in dbu, the exact set of rule ids Magic reports). The first group is the
+# KLayout deck's review probes (tests/rules/test_klayout_deck.py) with the ids KLayout
+# reports on them; "differs" marks the documented approximations of the Magic rules, where
+# the KLayout ids are given in the comment. The tap-distance rules are KLayout-only.
+MAGIC_PROBES: dict[str, tuple[list[tuple[str, int, int, int, int]], set[str]]] = {
+    "legal_nfet": ([("nd", 0, 0, 2000, 1000), ("po", 640, -400, 1360, 1400)], set()),
+    "field_po_near_df": ([("nd", 0, 0, 1000, 1000), ("po", 1300, 0, 1540, 1000)],
+                         {"po.s.df"}),
+    "po_flush": ([("nd", 0, 0, 2000, 1000), ("po", 640, -400, 1360, 1000)], {"po.x.df"}),
+    # differs: KLayout {po.x.df}; Magic measures the end inside df as a gate side
+    "po_inside": ([("nd", 0, 0, 2000, 1000), ("po", 640, -400, 1360, 700)],
+                  {"df.x.po", "po.l.n"}),
+    "df_flush": ([("nd", 0, 0, 1360, 1000), ("po", 640, -400, 1360, 1400)], {"df.x.po"}),
+    # differs: KLayout {df.x.po}; as po_inside
+    "df_inside": ([("nd", 0, 0, 1200, 1000), ("po", 640, -400, 1360, 1400)],
+                  {"po.x.df", "po.l.n"}),
+    # differs: KLayout {po.x.sab, sab.area}; Magic's side enclosure also sees the flush end
+    "po_sab_flush": ([("sab", 0, 0, 1000, 2000), ("po", 300, -1000, 540, 2000)],
+                     {"po.x.sab", "sab.e.po", "sab.area"}),
+    "po_sab_inside": ([("sab", 0, 0, 1000, 2000), ("po", 300, -1000, 540, 1500)],
+                      {"sab.area"}),
+    "nd_wholly_in_sab": ([("sab", 0, 0, 1800, 1800), ("nd", 400, 400, 1400, 1400)], set()),
+    "df_sab_inside": ([("sab", 0, 0, 2000, 2000), ("nd", 300, -1000, 1300, 1600)], set()),
+    "po_wholly_in_sab": ([("sab", 0, 0, 1800, 3000), ("po", 400, 400, 640, 2600)], set()),
+    "short_end_cap": ([("nd", 0, 0, 2000, 1000), ("po", 640, -100, 1360, 1400)],
+                      {"po.x.df"}),
+    "short_df_extension": ([("nd", 440, 0, 2000, 1000), ("po", 640, -400, 1360, 1400)],
+                           {"df.x.po"}),
+    "po_abutting_df": ([("nd", 0, 0, 1000, 1000), ("po", 1000, 0, 1240, 1000)], {"po.s.df"}),
+    "po_sab_legal": ([("sab", 0, 0, 1000, 2000), ("po", 300, -1000, 540, 3000)],
+                     {"sab.area"}),
+    # differs: KLayout {df.x.sab}; as po_sab_flush
+    "df_sab_flush": ([("sab", 0, 0, 2000, 2000), ("nd", 300, -1000, 1300, 2000)],
+                     {"df.x.sab", "sab.e.df"}),
+    "hanging_co": ([("m1", 0, 0, 1000, 1000), ("co", 900, 300, 1120, 520)],
+                   {"m1.e.co", "co.in"}),
+    "legal_outside": ([("nw", 5000, 0, 8000, 3000), ("nd", 0, 0, 1000, 1000),
+                       ("co", 300, 300, 520, 520), ("m1", 180, 180, 640, 640),
+                       ("po", 3000, -1000, 3240, 2000)], {"m1.area"}),
+    # further probes, each checked against the KLayout deck when written (same ids unless
+    # marked "differs")
+    "co_rect": ([("nd", 0, 0, 2000, 2000), ("co", 900, 900, 1120, 1125),
+                 ("m1", 500, 500, 1500, 1500)], {"co.size"}),
+    "v1_straddle_m1": ([("m1", 0, 0, 1000, 1000), ("m2", 0, 0, 2000, 1000),
+                        ("v1", 900, 300, 1170, 570)], {"m1.e.v1"}),
+    # differs: KLayout reports nothing for a cut without metal
+    "v1_no_m1": ([("m2", 0, 0, 2000, 1000), ("v1", 900, 300, 1170, 570)], {"m1.e.v1"}),
+    "stacked_co_v1": ([("nd", 0, 0, 2000, 2000), ("co", 890, 890, 1110, 1110),
+                       ("m1", 500, 500, 1500, 1500), ("v1", 865, 865, 1135, 1135),
+                       ("m2", 500, 500, 1500, 1500)], set()),
+    # differs: KLayout {nw.e.pd}; Magic's spacing also sees the outside part touch nw
+    "nw_pd_straddle": ([("nw", 0, 0, 5000, 5000), ("pd", 4500, 1000, 5500, 2000)],
+                       {"nw.e.pd", "nw.s.pd"}),
+    "nw_pd_close": ([("nw", 0, 0, 5000, 5000), ("pd", 3500, 1000, 4500, 2000)], {"nw.e.pd"}),
+    "nw_nd_close": ([("nw", 0, 0, 5000, 5000), ("nd", 1000, 1000, 4645, 2000)], {"nw.e.nd"}),
+    "nw_nd_near": ([("nw", 0, 0, 5000, 5000), ("nd", 5500, 1000, 6500, 2000)], {"nw.s.nd"}),
+    "co_field": ([("co", 0, 0, 220, 220), ("m1", -500, -500, 720, 720)], {"co.in"}),
+    "co_gate": ([("nd", 0, 0, 2000, 2000), ("po", 640, -400, 1360, 2400),
+                 ("co", 890, 890, 1110, 1110), ("m1", 500, 500, 1500, 1500)], {"co.no.gate"}),
+    "co_butt": ([("nw", -3000, -3000, 5000, 5000), ("pd", 0, 0, 1000, 1000),
+                 ("nd", 1000, 0, 2000, 1000), ("co", 890, 390, 1110, 610),
+                 ("m1", 500, 0, 1500, 1000)], {"co.no.butt"}),
+    "co_straddle_df": ([("nd", 0, 0, 1000, 1000), ("co", 900, 300, 1120, 520),
+                        ("m1", 500, 0, 1500, 1000)], {"co.in", "df.e.co"}),
+    "co_df_close": ([("nd", 0, 0, 1000, 1000), ("co", 700, 300, 920, 520),
+                     ("m1", 300, 0, 1300, 1000)], {"df.e.co"}),
+    "po_co_close": ([("po", 0, 0, 1000, 1000), ("co", 700, 300, 920, 520),
+                     ("m1", 300, 0, 1300, 1000)], {"po.e.co"}),
+    "co_near_gate": ([("nd", 0, 0, 2000, 2000), ("po", 640, -270, 1360, 2270),
+                      ("co", 1595, 890, 1815, 1110), ("m1", 1475, 600, 1935, 1400)],
+                     {"co.s.gate"}),
+    "pco_near_df": ([("po", 0, 0, 800, 1000), ("co", 400, 390, 620, 610),
+                     ("m1", 280, 200, 740, 800), ("nd", 855, 0, 1855, 1000)],
+                    {"co.po.s.df", "po.s.df"}),
+    # differs: KLayout {sab.e.po, sab.no.gate, sab.area}; the poly over a gate is a
+    # transistor in Magic, not unsilicided poly, so the side enclosure does not see it
+    "sab_gate": ([("nd", 0, 0, 2000, 2000), ("po", 640, -400, 1360, 2400),
+                  ("sab", 500, 500, 1500, 1500)], {"sab.no.gate", "sab.area"}),
+    "sab_e_po_side": ([("sab", 0, 0, 1000, 3500), ("po", 100, -1000, 340, 4500)],
+                      {"sab.e.po"}),
+    "sab_df_near": ([("sab", 0, 0, 2000, 2000), ("nd", 2200, 0, 3200, 1000)], {"sab.s.df"}),
+    "sab_po_cross_and_near": ([("sab", 0, 0, 2000, 2000), ("po", 300, -1000, 540, 3000),
+                               ("po", 2300, -1000, 2540, 3000)], {"sab.s.po"}),
+    "short_l_n": ([("nd", 0, 0, 2000, 2000), ("po", 640, -400, 1355, 2400)], {"po.l.n"}),
+    "short_l_p": ([("nw", -1000, -1000, 3000, 3000), ("pd", 0, 0, 2000, 2000),
+                   ("po", 640, -400, 1235, 2400)], {"po.l.p"}),
+    "nd_near_pgate": ([("nw", -3000, -3000, 3000, 5000), ("pd", -1000, 0, 1000, 2000),
+                       ("po", -360, -400, 360, 2400), ("nd", -500, 2870, 500, 3600)],
+                      {"nd.s.pgate"}),
+    "nd_far_pgate": ([("nw", -3000, -3000, 3000, 5000), ("pd", -1000, 0, 1000, 2000),
+                      ("po", -360, -400, 360, 2400), ("nd", -500, 2935, 500, 3600)], set()),
+    "pd_near_ngate": ([("nd", -1000, 0, 1000, 2000), ("po", -360, -400, 360, 2400),
+                       ("pd", -500, 2870, 500, 3600)], {"pd.s.ngate"}),
+    "df_np_near": ([("nd", 0, 0, 1000, 1000), ("pd", 1450, 0, 2450, 1000)], {"df.s.np"}),
+    "df_np_butted": ([("pd", 1000, 0, 2000, 1000), ("nd", 0, 0, 1000, 1000)], set()),
+    "dnw_narrow": ([("dnw", 0, 0, 3670, 20000)], {"dnw.w"}),
+}
+
+
+@pytest.mark.sandbox
+def test_magic_probes(sandbox, work, process):
+    for name, (boxes, _) in MAGIC_PROBES.items():
+        _gds(work / f"{name}.gds", process, name, boxes)
+    counts, whys = _results(_magic(sandbox, work, _drc_script(list(MAGIC_PROBES))))
+    assert set(counts) == set(MAGIC_PROBES)
+    wrong = {name: sorted(whys[name]) for name, (_, want) in MAGIC_PROBES.items()
+             if whys[name] != want}
+    assert not wrong

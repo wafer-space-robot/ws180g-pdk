@@ -51,3 +51,11 @@ with the GF rule text and the fixture.
 First run (2026-11-07, 151 pass fixtures, before any decision): 9K 139 clean / 12 dirty,
 11K 139 / 12, 30K 134 / 17 (PP.1, NP.5b on the 8 butted fixtures; DN.3 on the 4 dnw
 fixtures; MT30.8 on 5 v4 fixtures at 30K only).
+
+Final run (2026-11-07, cold, no cache; 147 gate fixtures = 151 pass fixtures less 4
+excluded, plus 4 regression fixtures): 9K 151 clean / 0 dirty (828 s), 11K 151 / 0 (873 s),
+30K 151 / 0 (791 s). Excluded under (c): 4 (dnw). Unresolved: 0.
+
+Positive control (`tests/precheck/test_gf180mcu_deck.py`): M1.1 and DF.3a_MV reported for
+every metal_top value, 700 to 704 categories run. The deck names its rules per layer and
+voltage: Mn.1 of Metal1 is `M1.1`, DF.3a under Dualgate is `DF.3a_MV`.

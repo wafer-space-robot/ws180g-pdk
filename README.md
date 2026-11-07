@@ -28,6 +28,26 @@ image) runs every per-rule fixture through the KLayout deck in one container run
 against its expected markers. Results are cached in `tmp/klayout-fixtures/run/cache/` by the bytes of
 the deck and the layout; delete `tmp/klayout-fixtures/` to force a fresh engine run (about 4 minutes).
 
+## Pre-commit checks
+
+Two checkers guard every commit:
+
+- `uv run ws180g-check-private [ROOT]` enforces the public-sources rule (design document,
+  section 13): every evidence entry names a registered source with a `url` and
+  `public = true`; every process field has an allowed `provenance` and cites only evidence ids
+  that exist; every vendored file under `evidence/sources/` matches its registered sha256; and
+  no git-tracked text file outside `tmp/` contains a marker word of private material (the
+  pattern list is fixed in `build/src/ws180g_build/private_check.py`). The few lines that must
+  mention such material, such as the design document's own rule, are listed in
+  `build/private-allow.txt` as `<path glob>: <exact line text>`, each with a comment saying
+  why; an entry exempts only that exact line, and an entry that matches nothing is a finding.
+- `uv run ws180g-check-names [ROOT]` checks library, cell, corner and device names.
+
+Both print one finding per line and exit 1 when there are any. Install the git hook once per
+clone with `tools/install-hooks` (it symlinks `tools/git-hooks/*` into the hooks directory,
+which worktrees share, so run it from the primary checkout); the hook runs both checkers from
+the root of the repository being committed and refuses the commit on a finding.
+
 ## Container image
 
 Every heavy EDA job (KLayout DRC, Magic, netgen, ngspice) runs in one pinned container image

@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+# Symlink every hook in tools/git-hooks/ into the repository's hooks directory. Idempotent;
+# in a worktree the hooks directory is the one shared by all worktrees (git-common-dir).
+# An existing hook that is not already this symlink is left alone and reported.
+set -euo pipefail
+
+repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+hooks="$(git -C "$repo" rev-parse --path-format=absolute --git-common-dir)/hooks"
+mkdir -p "$hooks"
+
+status=0
+for hook in "$repo"/tools/git-hooks/*; do
+    name="$(basename "$hook")"
+    target="$hooks/$name"
+    if [[ -L "$target" && "$(readlink "$target")" == "$hook" ]]; then
+        echo "install-hooks: $name already installed"
+    elif [[ -e "$target" || -L "$target" ]]; then
+        echo "install-hooks: $target exists and is not a link to $hook; leaving it" >&2
+        status=1
+    else
+        ln -s "$hook" "$target"
+        echo "install-hooks: installed $name -> $hook"
+    fi
+done
+exit "$status"

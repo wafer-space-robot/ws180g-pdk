@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+# Pre-commit hook: runs the private-data checker and the naming checker on the repository
+# being committed (the files its index lists). Install it with tools/install-hooks.
+#
+# The checkers run from the uv project in WS180G_PROJECT (default: the repository root), so
+# a test can check a scratch repository with the workspace's code.
+set -euo pipefail
+
+root="$(git rev-parse --show-toplevel)"
+project="${WS180G_PROJECT:-$root}"
+cd "$root"
+
+status=0
+for check in ws180g-check-private ws180g-check-names; do
+    if ! uv run --quiet --project "$project" "$check" "$root"; then
+        echo "pre-commit: $check found problems (listed above); commit refused" >&2
+        status=1
+    fi
+done
+exit "$status"

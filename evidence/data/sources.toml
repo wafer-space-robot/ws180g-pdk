@@ -124,3 +124,36 @@ public = true
 "select" = "99dc4b5d0b708c1b0774a11d0f6e3f5d14e369fa019ed851e2827cc3ef659182"
 "thick-active" = "eba44f6483e1fc15b4fa6fde6f92ec27004c26a90e13954f29e161a1751ac143"
 "well" = "35d1c3d5c9d93c6a75ead2d5767836e649ec3321d8ef1b67bf51a2d12283b11b"
+
+[sources.xc018]
+title = "X-FAB XC018 0.18 µm process data sheet rev 3.0 (2008)"
+url = "https://datasheet.datasheetarchive.com/originals/crawler/xfab.com/a3edb8140abfda7a83325589538d6415.pdf"
+licence = "see README: not redistributed"
+retrieved = 2026-11-07
+transcribed = true
+vendored = false
+public = true
+
+[sources.xc018.sha256]
+"xc018_datasheet.pdf" = "f7cc3687bbf409fd50cf53f7502a20dfbed9aef43da634f3e01e08ed1a4db6cf"
+
+[sources.gf180mcu-models]
+title = "GF180MCU open PDK ngspice model card sm141064.ngspice (gf180mcu_fd_pr; lines and sha256 of the open_pdks 1689ac3 installed copy)"
+url = "https://github.com/fossi-foundation/globalfoundries-pdk-libs-gf180mcu_fd_pr/blob/63d25e2aeb8db6976cc107474a9658b4ea73cc05/models/ngspice/sm141064.ngspice"
+licence = "Apache-2.0"
+commit = "63d25e2aeb8db6976cc107474a9658b4ea73cc05"
+retrieved = 2026-11-07
+transcribed = true
+vendored = false
+public = true
+
+[sources.gf180mcu-models.sha256]
+"sm141064.ngspice" = "69a7ab877344a6d477fdd11440457f64e7ad88a624504a737a161da463de8bc8"
+
+[sources.onc18]
+title = "onsemi ONC18 data sheet ONC181818/D rev 0 (2016)"
+url = "https://www.onsemi.com/site/pdf/ONC181818-D.PDF"
+licence = "see README: not redistributed"
+transcribed = false
+vendored = false
+public = true

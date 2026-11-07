@@ -17,7 +17,11 @@ def _literal(value: object) -> str:
 
 
 def set_toml(path: Path, keys: list[str], value: object) -> None:
-    """Rewrite one `key = value` line; `keys[:-1]` name the `[table]`, `keys[-1]` the key."""
+    """Rewrite one `key = value` line; `keys[:-1]` name the `[table]`, `keys[-1]` the key.
+
+    Single-line scalar values only (no multi-line arrays or inline tables); a string value
+    containing `#` is not supported.
+    """
     *tables, key = keys
     lines = path.read_text().splitlines(keepends=True)
     header = re.compile(r"^\s*\[([^\[\]]+)\]\s*(#.*)?$")

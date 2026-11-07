@@ -1,0 +1,116 @@
+# SPDX-License-Identifier: Apache-2.0
+# The ws180g005 -> GF180MCU retarget mapping (Task 18, gate check 2).
+#
+# Every value cites the public file it was read from: the GF180MCU design-manual CSV tables
+# vendored under evidence/sources/gf180mcu-drm/ (Apache-2.0, open PDK `tables_clear`), or the
+# public KLayout deck of the open PDK (/foss/pdks/gf180mcuD/libs.tech/klayout/tech/drc/ in the
+# container image), read on 2026-11-07.
+#
+# 5LM stack conflict. The DRM table 03_met_levels8_1.csv describes 5LM as Metal1..Metal4,
+# Via1..Via4 and MetalTop (53/0), "SKIP Metal5, Via5"; 03_met_levels8_2.csv describes it as
+# Metal1..Metal5, Via1..Via4 with "Metal 5 must comply with MetalTop rule". The deciding
+# source is the deck that runs the check: generic_layers.rb (METAL_STACK_MAP, lines 235-244)
+# maps metal_level 5 to `top_via: via4`, `top_metal: metal5`. So the ws180g top metal `mtop`
+# goes to Metal5 81/0, and v4 to Via4 41/0.
+
+target = "gf180mcu"
+variant = "gf180mcuD"
+metal_level = "5LM"
+source = "evidence/sources/gf180mcu-drm/03_met_levels8_2.csv; deck generic_layers.rb METAL_STACK_MAP"
+
+# Generated ws180g layers with no GF180MCU counterpart: the deck derives its own gate and
+# taps from COMP, Poly2, Nplus, Pplus and Nwell (generic_layers.rb STATIC_LAYERS).
+drop = ["gate", "ntap", "ptap"]
+drop_reason = "no GF180MCU drawn layer; the deck derives gate and taps itself (generic_layers.rb)"
+
+[layer_map]
+nw = { to = [{ gds = [21, 0], name = "Nwell" }], source = "evidence/sources/gf180mcu-drm/06_Drawn_layer10.csv" }
+nd = { to = [{ gds = [22, 0], name = "COMP" }], source = "evidence/sources/gf180mcu-drm/06_Drawn_layer10.csv" }
+pd = { to = [{ gds = [22, 0], name = "COMP" }], source = "evidence/sources/gf180mcu-drm/06_Drawn_layer10.csv" }
+po = { to = [{ gds = [30, 0], name = "Poly2" }], source = "evidence/sources/gf180mcu-drm/06_Drawn_layer10.csv" }
+co = { to = [{ gds = [33, 0], name = "Contact" }], source = "evidence/sources/gf180mcu-drm/06_Drawn_layer10.csv" }
+m1 = { to = [{ gds = [34, 0], name = "Metal1" }], source = "evidence/sources/gf180mcu-drm/06_Drawn_layer10.csv" }
+v1 = { to = [{ gds = [35, 0], name = "Via1" }], source = "evidence/sources/gf180mcu-drm/06_Drawn_layer10.csv" }
+m2 = { to = [{ gds = [36, 0], name = "Metal2" }], source = "evidence/sources/gf180mcu-drm/06_Drawn_layer10.csv" }
+v2 = { to = [{ gds = [38, 0], name = "Via2" }], source = "evidence/sources/gf180mcu-drm/06_Drawn_layer10.csv" }
+m3 = { to = [{ gds = [42, 0], name = "Metal3" }], source = "evidence/sources/gf180mcu-drm/06_Drawn_layer10.csv" }
+v3 = { to = [{ gds = [40, 0], name = "Via3" }], source = "evidence/sources/gf180mcu-drm/06_Drawn_layer10.csv" }
+m4 = { to = [{ gds = [46, 0], name = "Metal4" }], source = "evidence/sources/gf180mcu-drm/06_Drawn_layer10.csv" }
+v4 = { to = [{ gds = [41, 0], name = "Via4" }], source = "evidence/sources/gf180mcu-drm/06_Drawn_layer10.csv" }
+mtop = { to = [{ gds = [81, 0], name = "Metal5" }], source = "evidence/sources/gf180mcu-drm/06_Drawn_layer10.csv", note = "5LM top metal per the deck (see the header comment)" }
+pad = { to = [{ gds = [37, 0], name = "Pad" }], source = "evidence/sources/gf180mcu-drm/06_Drawn_layer10.csv" }
+sab = { to = [{ gds = [49, 0], name = "SAB" }], source = "evidence/sources/gf180mcu-drm/06_Drawn_layer10.csv" }
+nsel = { to = [{ gds = [32, 0], name = "Nplus" }], source = "evidence/sources/gf180mcu-drm/06_Drawn_layer10.csv" }
+psel = { to = [{ gds = [31, 0], name = "Pplus" }], source = "evidence/sources/gf180mcu-drm/06_Drawn_layer10.csv" }
+dnw = { to = [{ gds = [12, 0], name = "DNWELL" }], source = "evidence/sources/gf180mcu-drm/06_Drawn_layer10.csv" }
+rhi = { to = [{ gds = [62, 0], name = "Resistor" }], source = "evidence/sources/gf180mcu-drm/06_Drawn_layer10.csv" }
+mk_res = { to = [{ gds = [110, 5], name = "RES_MK" }], source = "evidence/sources/gf180mcu-drm/06_Drawn_layer10.csv" }
+mk_dio = { to = [{ gds = [115, 5], name = "DIODE_MK" }], source = "evidence/sources/gf180mcu-drm/06_Drawn_layer10.csv" }
+mk_bjt = { to = [{ gds = [118, 5], name = "LVS_BJT" }, { gds = [127, 5], name = "DRC_BJT" }], source = "evidence/sources/gf180mcu-drm/06_Drawn_layer10.csv", note = "DF.3c checks DRC_BJT" }
+mk_cap = { to = [{ gds = [166, 5], name = "MOS_CAP_MK" }], source = "evidence/sources/gf180mcu-drm/06_Drawn_layer10.csv", note = "the Phase 0 capacitor is a MOS capacitor; CAP_MK 117/5 is MIM, a later module" }
+mk_esd = { to = [{ gds = [24, 5], name = "ESD_MK" }], source = "evidence/sources/gf180mcu-drm/06_Drawn_layer10.csv" }
+mk_nofill = { to = [{ gds = [111, 5], name = "NDMY" }, { gds = [152, 5], name = "PMNDMY" }], source = "evidence/sources/gf180mcu-drm/06_Drawn_layer10.csv" }
+mk_boundary = { to = [{ gds = [0, 0], name = "PR_bndry" }], source = "evidence/sources/gf180mcu-drm/06_Drawn_layer10.csv", note = "the cell boundary EDA mark" }
+
+# Exact cut sizes of the target (min = max): retarget regenerates every cut at this size,
+# centred on the drawn cut.
+[cut_sizes]
+co = { size = 0.22, rule = "CO.1", source = "evidence/sources/gf180mcu-drm/21_Contact_56.csv" }
+v1 = { size = 0.26, rule = "Vn.1", source = "evidence/sources/gf180mcu-drm/23_Vian_59.csv" }
+v2 = { size = 0.26, rule = "Vn.1", source = "evidence/sources/gf180mcu-drm/23_Vian_59.csv" }
+v3 = { size = 0.26, rule = "Vn.1", source = "evidence/sources/gf180mcu-drm/23_Vian_59.csv" }
+v4 = { size = 0.26, rule = "Vn.1", source = "evidence/sources/gf180mcu-drm/23_Vian_59.csv" }
+
+[grid]
+value = 0.005
+rule = "GRID"
+source = "evidence/sources/gf180mcu-drm/10_Design_Geometry_Rules27.csv"
+
+# ws180g005 is all 5 V: the whole design gets the 5 V gate oxide (Dualgate) and the 5 V
+# transistor mark (V5_XTOR), one box each, the bounding box of all drawn shapes sized by
+# `margin` um (above DV.5 width 0.7, DV.6 COMP enclosure 0.24, DV.8 Poly2 enclosure 0.4).
+[oxide]
+layers = [{ gds = [55, 0], name = "Dualgate" }, { gds = [112, 1], name = "V5_XTOR" }]
+margin = 1.0
+rules = ["DV.5", "DV.6", "DV.8", "PL.11"]
+source = "evidence/sources/gf180mcu-drm/15_Dualgate40_2.csv; evidence/sources/gf180mcu-drm/16_Poly2_42.csv; evidence/sources/gf180mcu-drm/06_Drawn_layer10.csv"
+
+# The public deck and its switches, read from `klayout -b -r gf180mcu.drc -rd help=true` on
+# 2026-11-07. The `decks` tags come from the `tags:` lines of the excluded rule files.
+[drc]
+deck = "/foss/pdks/gf180mcuD/libs.tech/klayout/tech/drc/gf180mcu.drc"
+decks = "all,-density,-dummy,-antenna"
+run_mode = "flat"
+workers = 1
+metal_top = ["9K", "11K", "30K"]
+source = "gf180mcu.drc -rd help=true (2026-11-07); rule_decks/*.rb tags"
+
+[[excluded_decks]]
+file = "density.rb"
+tag = "density"
+reason = "metal and poly density need a whole die with fill; Phase 1"
+source = "rule_decks/density.rb tags: %w[all density]"
+
+[[excluded_decks]]
+file = "dummy_comp.rb"
+tag = "dummy"
+reason = "dummy (fill) COMP rules: fill is Phase 1"
+source = "rule_decks/dummy_comp.rb tags: %w[all beol dummy dummy_comp]"
+
+[[excluded_decks]]
+file = "dummy_poly2.rb"
+tag = "dummy"
+reason = "dummy (fill) Poly2 rules: fill is Phase 1"
+source = "rule_decks/dummy_poly2.rb tags: %w[all beol dummy dummy_poly2]"
+
+[[excluded_decks]]
+file = "dummy_metal.rb"
+tag = "dummy"
+reason = "dummy (fill) metal rules: fill is Phase 1"
+source = "rule_decks/dummy_metal.rb tags: %w[all beol dummy] + dummy_metal<n>"
+
+[[excluded_decks]]
+file = "antenna.rb"
+tag = "antenna"
+reason = "antenna ratios need the routed die; Phase 1"
+source = "rule_decks/antenna.rb tags: %w[all feol antenna]"

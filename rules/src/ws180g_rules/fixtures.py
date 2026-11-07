@@ -55,8 +55,8 @@ CUT_METALS = {"co": ("m1",), "v1": ("m1", "m2"), "v2": ("m2", "m3"), "v3": ("m3"
 CUTS = ("co", "v1", "v2", "v3", "v4")
 #: Context metal boxes closer than this are merged into one box (beyond every metal space).
 METAL_MERGE = 2200
-#: Companion v4 cuts of a 2 x 2 array are shifted this far left in the lower row, so the
-#: right side of the tested cut (top right) is the only one at the margin under test.
+#: The lower row of the staggered 2 x 2 v4 array (the fail fixture of mtop.v4.array) is
+#: shifted this far left.
 V4_SHIFT = 350
 _LENGTH_CONDITION = re.compile(r"^\s*length\s*>\s*(\d+(?:\.\d+)?)\s*$")
 
@@ -68,13 +68,26 @@ _LENGTH_CONDITION = re.compile(r"^\s*length\s*>\s*(\d+(?:\.\d+)?)\s*$")
 #:   edge is a gate edge: co.s.gate (also 0.24 um) fires with co.po.s.df;
 #: - a rotated cut is neither a square box nor of the exact bounding box: co.size too;
 #: - an off-grid coordinate is shared by the two ends of an orthogonal edge, and a 45 degree
-#:   edge cannot bring both coordinates back on the grid: two grid markers.
+#:   edge cannot bring both coordinates back on the grid: two grid markers;
+#: - every v4 cluster is a rectangular array at the minimum space (mtop.v4.array): a
+#:   straight outer edge at the margin meets both cuts of the right column, and columns at
+#:   a space under v4.s are two pairs, so two markers; one cut a grid step larger than the
+#:   others either breaks the cluster's rectangle (its four cuts, mtop.v4.array) or the
+#:   space; and the staggered array is four cuts of a non-rectangular cluster.
 EXPECTED_MARKERS: dict[tuple[str, str], dict[str, int]] = {
     ("df.e.co", "straddle"): {"df.e.co": 1, "co.in": 1},
     ("po.e.co", "straddle"): {"po.e.co": 1, "co.in": 1},
     ("co.po.s.df", "min_minus_grid"): {"co.po.s.df": 1, "co.s.gate": 1},
     ("cut.ortho", "cut_ortho"): {"cut.ortho": 1, "co.size": 1},
     ("grid", "grid"): {"grid": 2},
+    ("m4.e.v4", "min_minus_grid"): {"m4.e.v4": 2},
+    ("m4.e.v4", "straddle"): {"m4.e.v4": 2},
+    ("mtop.e.v4", "min_minus_grid"): {"mtop.e.v4": 2},
+    ("mtop.e.v4", "straddle"): {"mtop.e.v4": 2},
+    ("v4.s", "min_minus_grid"): {"v4.s": 2},
+    ("v4.size", "oversize"): {"v4.size": 1, "mtop.v4.array": 4},
+    ("v4.size", "rect"): {"v4.size": 1, "mtop.v4.array": 4},
+    ("mtop.v4.array", "staggered"): {"mtop.v4.array": 4},
 }
 
 
@@ -246,11 +259,12 @@ def nwell_around(c: Cell, margin: int = UM) -> kdb.Box:
     return c.add("nw", c.bbox().enlarged(margin, margin))
 
 
-def v4_cluster(c: Cell, k: Kit, right: int, top: int, shift: int = V4_SHIFT,
+def v4_cluster(c: Cell, k: Kit, right: int, top: int, shift: int = 0,
                first: kdb.Box | None = None) -> list[kdb.Box]:
     """A 2 x 2 v4 array at the minimum space whose top-right cut (returned first) ends at
-    (right, top); the lower row is shifted `shift` to the left so that the top-right cut is
-    the only rightmost one. `first` replaces the top-right cut (the exact-size fixtures)."""
+    (right, top): a rectangular array, as mtop.v4.array (and GF MT30.8) require; a non-zero
+    `shift` moves the lower row left (the staggered fail fixture). `first` replaces the
+    top-right cut (the exact-size fixtures)."""
     a, s = k.cut("v4"), k.v("v4.s")
     tr = kdb.Box(right - a, top - a, right, top)
     tl = tr.moved(-(a + s), 0)
@@ -330,10 +344,20 @@ def _gate_length(row: RuleRow, k: Kit) -> list[Case]:
 
 def _space_cuts(c: Cell, k: Kit, layer: str, s: int) -> None:
     if layer == "v4":
-        # P and Q at the space under test, R below P and S below Q at the minimum, R-S at
-        # the minimum: one cluster of four, so the array rule holds
+        # Every v4 cluster is a rectangular array (mtop.v4.array, GF MT30.8). Above the
+        # minimum: two 2 x 2 arrays at the minimum space, side by side at the space under
+        # test (two clusters of four; together one rectangle for MT30.8). At or below it:
+        # one 2 x 2 array with its columns at the space under test and its rows at the
+        # minimum (two v4.s markers when failing, EXPECTED_MARKERS).
         a, smin = k.cut("v4"), k.v("v4.s")
-        for x, y in ((0, 0), (a + s, 0), (0, -(a + smin)), (a + smin, -(a + smin))):
+        rows = (0, -(a + smin))
+        if s > smin:
+            right = 2 * a + smin + s
+            columns = (0, a + smin, right, right + a + smin)
+        else:
+            columns = (0, a + s)
+        points = [(x, y) for x in columns for y in rows]
+        for x, y in points:
             c.box("v4", x, y, x + a, y + a)
         return
     base = "po" if layer == "co" else None
@@ -445,19 +469,23 @@ def _min_enclosure(row: RuleRow, k: Kit) -> list[Case]:
     cases = []
     for expect, name, m in [*_steps(v, k.g), ("fail", "straddle", None)]:
         c = Cell()
+        # a v4 array is rectangular (mtop.v4.array): a straight outer edge at the margin
+        # meets both cuts of its right column (EXPECTED_MARKERS)
         boxes = _inner(c, k, outer, inner)
         bb = kdb.Box()
         for b in boxes:
             bb += b
         tested = boxes[0]
         if m is None:  # the tested shape crosses the outer edge
-            t = tested.width() // 2
-            if len(boxes) > 1:
-                t = min(t, V4_SHIFT - v) // k.g * k.g
+            t = tested.width() // 2 // k.g * k.g
             right = tested.right - t
         else:
             right = tested.right + m
-        c.box(outer, bb.left - other, bb.bottom - other, right, bb.top + other)
+        top = bb.top + other
+        # at least the outer layer's minimum width, also when the straddle pulls it in
+        left = min(bb.left - other, right - k.min_width(outer))
+        bottom = min(bb.bottom - other, top - k.min_width(outer))
+        c.box(outer, left, bottom, right, top)
         cases.append((expect, name, c))
     return cases
 
@@ -527,7 +555,7 @@ def _exact_size(row: RuleRow, k: Kit) -> list[Case]:
                                ("fail", "rect", v, v + k.g)):
         c = Cell()
         if layer == "v4":  # the top-right cut of an array grows right and up
-            v4_cluster(c, k, 0, 0, shift=0, first=kdb.Box(-v, -v, -v + w, -v + h))
+            v4_cluster(c, k, 0, 0, first=kdb.Box(-v, -v, -v + w, -v + h))
         else:
             cut(c, k, layer, 0, 0, base="po" if layer == "co" else None, w=w, h=h)
         cases.append((expect, name, c))
@@ -615,10 +643,13 @@ def _sab_on_gate(row: RuleRow, k: Kit) -> list[Case]:
 
 def _v4_array(row: RuleRow, k: Kit) -> list[Case]:
     good, bad = Cell(), Cell()
-    v4_cluster(good, k, 0, 0, shift=0)
+    v4_cluster(good, k, 0, 0)
     a = k.cut("v4")
     bad.box("v4", 0, 0, a, a)
-    return [("pass", "v4_array", good), ("fail", "v4_array", bad)]
+    staggered = Cell()
+    v4_cluster(staggered, k, 0, 0, shift=V4_SHIFT)
+    return [("pass", "v4_array", good), ("fail", "v4_array", bad),
+            ("fail", "staggered", staggered)]
 
 
 def _grid(row: RuleRow, k: Kit) -> list[Case]:

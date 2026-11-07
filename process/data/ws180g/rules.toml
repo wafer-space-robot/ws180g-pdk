@@ -859,7 +859,7 @@ provenance = "public-source"
 evidence = []
 fixture = "v4_array"
 engines = ["klayout"]
-note = "every v4 cluster under mtop is at least 2 x 2: GF180MCU MT30.8b \"There shall be minimum 2X2 array of vias (top vias) at one location connecting to 3um thick top metal.\" (25_Thick_MetalTop_62.csv, row MT30.8b; no value, so no evidence entry)"
+note = "every v4 cluster under mtop (cuts at up to rules.v4.s apart) is a full rectangular array of at least 2 x 2: GF180MCU MT30.8b \"There shall be minimum 2X2 array of vias (top vias) at one location connecting to 3um thick top metal.\" (25_Thick_MetalTop_62.csv, row MT30.8b; no value, so no evidence entry). The public deck (rule_decks/metaltop_30k.rb) rejects a via cluster that is not a rectangle after 1 um over-under sizing; a staggered cluster passed the earlier generic check and failed MT30.8, so the generic check also rejects non-rectangular clusters (Task 18, docs/phase-0-retarget-log.md)"
 
 # --- pad
 
@@ -1044,7 +1044,7 @@ fixture = "sab_on_gate"
 engines = ["klayout", "magic"]
 note = "sab never overlaps gate: GF180MCU SB.16 \"SAB layer cannot exist on 3.3V and 5V/6V CMOS transistors' Poly and COMP area of the core circuit\" (19_SAB_52.csv, row SB.16; no value, so no evidence entry)"
 
-# --- generated selects (proven by construction in layergen, Task 11; no deck rule)
+# --- generated selects (by construction in layergen, Task 11; no deck rule; the notes say where the construction fails)
 
 [rules."nsel.w"]
 kind = "min-width"
@@ -1057,7 +1057,7 @@ evidence = ["gf180mcu-drm/NP.1", "scmos8/4.4/deep", "scmos8/4.4/subm"]
 margin = 1.2
 margin_achieved = 1.200
 engines = []
-note = "GF NP.1 0.40; S8 4.4 4 lambda 0.36 / 2 lambda 0.20; 1.2 x 0.40; width by construction: rules.df.w 0.36 + 2 x rules.sel.x >= 0.48; space by the close step of layergen; both proven by Task 11 unit tests, no fixtures"
+note = "GF NP.1 0.40; S8 4.4 4 lambda 0.36 / 2 lambda 0.20; 1.2 x 0.40; width and space by construction for an active that is not butted, or butted on one side only: rules.df.w 0.36 + 2 x rules.sel.x >= 0.48, gaps under the space closed by the close step, and (since Task 18) the x-by-x prongs beyond a butting edge removed by opening psel by rules.psel.w; covered by the Task 11 and Task 18 layergen tests, no fixtures, no deck rule. The construction FAILS for a bar of one diffusion type narrower than the select width (rules.df.w) butted to the other type on both long sides: the bar's select is only the bar's width (0.36, below 0.48 and GF NP.1/PP.1 0.40; a pd bar's psel also gets no extension beyond its short ends, GF PP.5b), and the other type's selects on its two sides face each other across it (below the space, GF NP.2/PP.2). Known limitation: test_derive.py test_known_limitation_narrow_{nd,pd}_* and docs/phase-0-retarget-log.md (open points); no Task 14 pass fixture draws it"
 
 [rules."nsel.s"]
 kind = "min-space"
@@ -1070,7 +1070,7 @@ evidence = ["gf180mcu-drm/NP.2", "scmos8/4.4/deep", "scmos8/4.4/subm"]
 margin = 1.2
 margin_achieved = 1.200
 engines = []
-note = "GF NP.2 0.40; S8 4.4 4 lambda 0.36 / 2 lambda 0.20; 1.2 x 0.40; width by construction: rules.df.w 0.36 + 2 x rules.sel.x >= 0.48; space by the close step of layergen; both proven by Task 11 unit tests, no fixtures"
+note = "GF NP.2 0.40; S8 4.4 4 lambda 0.36 / 2 lambda 0.20; 1.2 x 0.40; width and space by construction for an active that is not butted, or butted on one side only: rules.df.w 0.36 + 2 x rules.sel.x >= 0.48, gaps under the space closed by the close step, and (since Task 18) the x-by-x prongs beyond a butting edge removed by opening psel by rules.psel.w; covered by the Task 11 and Task 18 layergen tests, no fixtures, no deck rule. The construction FAILS for a bar of one diffusion type narrower than the select width (rules.df.w) butted to the other type on both long sides: the bar's select is only the bar's width (0.36, below 0.48 and GF NP.1/PP.1 0.40; a pd bar's psel also gets no extension beyond its short ends, GF PP.5b), and the other type's selects on its two sides face each other across it (below the space, GF NP.2/PP.2). Known limitation: test_derive.py test_known_limitation_narrow_{nd,pd}_* and docs/phase-0-retarget-log.md (open points); no Task 14 pass fixture draws it"
 
 [rules."psel.w"]
 kind = "min-width"
@@ -1083,7 +1083,7 @@ evidence = ["gf180mcu-drm/PP.1", "scmos8/4.4/deep", "scmos8/4.4/subm"]
 margin = 1.2
 margin_achieved = 1.200
 engines = []
-note = "GF PP.1 0.40; S8 4.4 4 lambda 0.36 / 2 lambda 0.20; 1.2 x 0.40; width by construction: rules.df.w 0.36 + 2 x rules.sel.x >= 0.48; space by the close step of layergen; both proven by Task 11 unit tests, no fixtures"
+note = "GF PP.1 0.40; S8 4.4 4 lambda 0.36 / 2 lambda 0.20; 1.2 x 0.40; width and space by construction for an active that is not butted, or butted on one side only: rules.df.w 0.36 + 2 x rules.sel.x >= 0.48, gaps under the space closed by the close step, and (since Task 18) the x-by-x prongs beyond a butting edge removed by opening psel by rules.psel.w; covered by the Task 11 and Task 18 layergen tests, no fixtures, no deck rule. The construction FAILS for a bar of one diffusion type narrower than the select width (rules.df.w) butted to the other type on both long sides: the bar's select is only the bar's width (0.36, below 0.48 and GF NP.1/PP.1 0.40; a pd bar's psel also gets no extension beyond its short ends, GF PP.5b), and the other type's selects on its two sides face each other across it (below the space, GF NP.2/PP.2). Known limitation: test_derive.py test_known_limitation_narrow_{nd,pd}_* and docs/phase-0-retarget-log.md (open points); no Task 14 pass fixture draws it"
 
 [rules."psel.s"]
 kind = "min-space"
@@ -1096,7 +1096,7 @@ evidence = ["gf180mcu-drm/PP.2", "scmos8/4.4/deep", "scmos8/4.4/subm"]
 margin = 1.2
 margin_achieved = 1.200
 engines = []
-note = "GF PP.2 0.40; S8 4.4 4 lambda 0.36 / 2 lambda 0.20; 1.2 x 0.40; width by construction: rules.df.w 0.36 + 2 x rules.sel.x >= 0.48; space by the close step of layergen; both proven by Task 11 unit tests, no fixtures"
+note = "GF PP.2 0.40; S8 4.4 4 lambda 0.36 / 2 lambda 0.20; 1.2 x 0.40; width and space by construction for an active that is not butted, or butted on one side only: rules.df.w 0.36 + 2 x rules.sel.x >= 0.48, gaps under the space closed by the close step, and (since Task 18) the x-by-x prongs beyond a butting edge removed by opening psel by rules.psel.w; covered by the Task 11 and Task 18 layergen tests, no fixtures, no deck rule. The construction FAILS for a bar of one diffusion type narrower than the select width (rules.df.w) butted to the other type on both long sides: the bar's select is only the bar's width (0.36, below 0.48 and GF NP.1/PP.1 0.40; a pd bar's psel also gets no extension beyond its short ends, GF PP.5b), and the other type's selects on its two sides face each other across it (below the space, GF NP.2/PP.2). Known limitation: test_derive.py test_known_limitation_narrow_{nd,pd}_* and docs/phase-0-retarget-log.md (open points); no Task 14 pass fixture draws it"
 
 [rules."sel.x"]
 kind = "generation"

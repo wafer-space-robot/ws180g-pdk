@@ -631,6 +631,12 @@ MAGIC_EXCEPTIONS: dict[tuple[str, str], MagicException] = {
         "edge borders diffusion like a source/drain edge, so df.x.po also measures the "
         "diffusion beyond the poly end against its 0.48 um; an edge rule cannot tell the "
         "two apart and cannot withdraw another rule's error"),
+    **{("v4.size", name): MagicException(
+        frozenset({"v4.size"}),
+        "a v4 one grid step larger than the others of its 2 x 2 array breaks the array's "
+        "rectangle, so KLayout also reports mtop.v4.array (Task 18); that rule is KLayout-only "
+        "(Magic cannot count the cuts of a cluster), so Magic reports v4.size alone")
+       for name in ("oversize", "rect")},
 }
 
 

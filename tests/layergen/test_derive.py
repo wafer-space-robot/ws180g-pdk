@@ -109,6 +109,26 @@ def test_butted_nd_pd_selects_meet_at_the_butting_edge(process):
     assert (rect("1", "0", "2", "1") - psel).is_empty()
 
 
+@pytest.mark.parametrize("pd_first", [True, False])
+def test_butted_selects_split_the_overhang_at_the_butting_line(process, x, pd_first):
+    """At a butting edge the selects meet on the straight butting line, also through the
+    overhang beyond the actives (GF NP.3d/PP.3d: select edge on the butting edge), so no
+    select gets an x-by-x prong narrower than psel.w / nsel.w (GF PP.1, NP.1) and each
+    keeps its extension beyond its own active (GF NP.5b, PP.5b). Found by the Task 18
+    retarget check (docs/phase-0-retarget-log.md)."""
+    layout, top = new_layout()
+    left, right = ("pd", "nd") if pd_first else ("nd", "pd")
+    box(layout, top, left, "0", "0", "1", "1", process)
+    box(layout, top, right, "1", "0", "2", "1", process)
+    derive(layout, process)
+    sel = {"pd": region(layout, top, "psel", process), "nd": region(layout, top, "nsel", process)}
+    assert (sel[left] ^ kdb.Region(kdb.Box(-x, -x, dbu("1"), dbu("1") + x))).is_empty()
+    assert (sel[right] ^ kdb.Region(kdb.Box(dbu("1"), -x, dbu("2") + x, dbu("1") + x))).is_empty()
+    for name in ("psel", "nsel"):
+        w = dbu(process.rules[f"{name}.w"].value)
+        assert region(layout, top, name, process).width_check(w).is_empty()
+
+
 @pytest.mark.parametrize("gap", ["0.28", "0.48"])
 def test_nd_pd_at_a_gap_get_non_overlapping_selects(process, gap):
     layout, top = new_layout()
@@ -164,11 +184,12 @@ def test_poly_without_sab_gets_no_psel(process):
     assert region(layout, top, "nsel", process).is_empty()
 
 
-def test_known_limitation_narrow_nd_between_pd_gets_nsel_only_over_the_nd(process):
+def test_known_limitation_narrow_nd_between_pd_gets_a_df_w_wide_nsel(process, x):
     """KNOWN LIMITATION, recorded not fixed: an nd bar of width df.w butted to pd on both
-    long sides gets an nsel that ends at the nd's short ends, because the band beyond them
-    lies within psel = close(P.sized(x)) - nd. The nsel is then only df.w wide. Whether that
-    is acceptable against GF NP.5b is left to the Task 18 retarget check."""
+    long sides gets an nsel only df.w wide. The band beyond each short end (df.w by x) is
+    narrower than psel.w, so `open` takes it out of psel and it falls to nsel, which then
+    covers the nd and extends x beyond its short ends (GF NP.5b); its width stays df.w, below
+    nsel.w. No Task 14 pass fixture draws this; the Task 18 retarget check did not meet it."""
     w = process.rules["df.w"].value
     layout, top = new_layout()
     box(layout, top, "pd", "-1", "0", "0", "2", process)
@@ -178,11 +199,32 @@ def test_known_limitation_narrow_nd_between_pd_gets_nsel_only_over_the_nd(proces
     nsel = region(layout, top, "nsel", process)
     psel = region(layout, top, "psel", process)
     assert (nsel & psel).is_empty()
-    assert (nsel ^ rect("0", "0", str(w), "2")).is_empty()
-    assert nsel.bbox() == kdb.Box(0, 0, dbu(w), dbu("2"))
-    # The band beyond each short end is psel.
-    assert (rect("0", "2", str(w), "2.1") - psel).is_empty()
-    assert (rect("0", "-0.1", str(w), "0") - psel).is_empty()
+    assert (nsel ^ kdb.Region(kdb.Box(0, -x, dbu(w), dbu("2") + x))).is_empty()
+    assert (rect("-1", "0", "0", "2") - psel).is_empty()
+    assert (rect(str(w), "0", str(w + 1), "2") - psel).is_empty()
+
+
+def test_known_limitation_narrow_pd_between_nd_gets_a_df_w_wide_psel(process):
+    """KNOWN LIMITATION, recorded not fixed (the mirror of the nd bar above): a pd bar of
+    width df.w butted to nd on both long sides gets a psel that is exactly the bar, df.w
+    wide (below psel.w and GF PP.1 0.40) and with no extension beyond its short ends (GF
+    PP.5b): the band beyond each end is narrower than psel.w, so `open` removes the whole
+    bar-wide psel and `P - nd` restores only the bar. nsel then rings the bar, a polygon
+    with a hole that touches the pd on all four sides. No Task 14 pass fixture draws it;
+    see docs/phase-0-retarget-log.md (open points) and the notes of rules.psel.w/.s."""
+    w = process.rules["df.w"].value
+    layout, top = new_layout()
+    box(layout, top, "nd", "-1", "0", "0", "2", process)
+    box(layout, top, "pd", "0", "0", str(w), "2", process)
+    box(layout, top, "nd", str(w), "0", str(w + 1), "2", process)
+    derive(layout, process)
+    nsel = region(layout, top, "nsel", process).merged()
+    psel = region(layout, top, "psel", process).merged()
+    assert (nsel & psel).is_empty()
+    assert (psel ^ rect("0", "0", str(w), "2")).is_empty()
+    assert psel.bbox().width() < dbu(process.rules["psel.w"].value)
+    assert nsel.count() == 1
+    assert next(iter(nsel.each())).holes() == 1
 
 
 def test_nsel_of_a_df_w_bar_is_at_least_nsel_w(process, x):

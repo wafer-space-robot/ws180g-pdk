@@ -29,12 +29,15 @@ class FakeRunner:
     def __init__(self, dirty: set[str]) -> None:
         self.dirty = dirty
         self.calls: list[list[str]] = []
+        self.jobs: list[int] = []
 
     def __call__(self, cmd: list[str], workdir: Path) -> subprocess.CompletedProcess:
         self.calls.append(cmd)
         script = cmd[-1]
         metal_top = script.split("metal_top=")[1].split()[0]
-        names = (workdir / f"list-{metal_top}.txt").read_text(encoding="utf-8").split()
+        self.jobs.append(len(list(workdir.glob(f"list-{metal_top}-*.txt"))))
+        names = [n for p in sorted(workdir.glob(f"list-{metal_top}-*.txt"))
+                 for n in p.read_text(encoding="utf-8").split()]
         for name in names:
             report = workdir / "reports" / metal_top / name.replace(".gds", ".lyrdb")
             report.parent.mkdir(parents=True, exist_ok=True)
@@ -98,3 +101,13 @@ def test_missing_report_is_an_error(tmp):
 
     with pytest.raises(RuntimeError, match="no report"):
         run_gf180mcu_drc_many(_inputs(tmp), tmp / "run", silent, MAPPING, "9K")
+
+
+def test_jobs_shard_the_list(tmp):
+    inputs = _inputs(tmp)
+    runner = FakeRunner(dirty={"a"})
+    results = run_gf180mcu_drc_many(inputs, tmp / "run", runner, MAPPING, "11K", jobs=4)
+    assert runner.jobs == [2]  # never more shards than layouts
+    assert results[inputs[0]].violations == {"DF.3a": 1}
+    script = gf180mcu_command(MAPPING, "11K", jobs=2)[2]
+    assert "for k in 0 1;" in script and "list-11K-$k.txt" in script

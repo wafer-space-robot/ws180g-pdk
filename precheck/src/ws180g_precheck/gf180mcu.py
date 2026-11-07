@@ -7,9 +7,10 @@
 1. copies every retargeted input to `out_dir/gds/<parent dir>__<stem>.gds` (flat, unique);
 2. looks each one up in `out_dir/cache/<key>.json`, the key being the SHA-256 of the
    layout's bytes, the mapping file's bytes, `metal_top` and the deck path (`cache_key`);
-3. for the misses only, writes `out_dir/list-<metal_top>.txt` and starts **one** container,
-   `sh -c '<loop>'`, which runs `klayout -b -r <deck>` once per listed layout (the public
-   deck has no batch mode) with the switches of `mapping.drc`, each run's output in
+3. for the misses only, writes `out_dir/list-<metal_top>-<k>.txt` (`jobs` shards) and starts
+   **one** container, `sh -c '<loops>'`, whose `jobs` parallel loops run `klayout -b -r
+   <deck>` once per listed layout (the public deck has no batch mode) with the switches of
+   `mapping.drc`, each run's output in
    `out_dir/logs/<metal_top>/<name>.log` and its report in
    `out_dir/reports/<metal_top>/<name>.lyrdb`;
 4. parses each report with `ws180g_rules.run_klayout.parse_lyrdb` (the categories are GF
@@ -50,28 +51,35 @@ def cache_key(gds: Path, mapping: Mapping, metal_top: str) -> str:
     return h.hexdigest()
 
 
-def gf180mcu_command(mapping: Mapping, metal_top: str) -> list[str]:
-    """The container command: one klayout run per line of `list-<metal_top>.txt`; the exit
-    code is 1 when any run failed (the others still run)."""
+def gf180mcu_command(mapping: Mapping, metal_top: str, jobs: int = 1) -> list[str]:
+    """The container command: `jobs` shell loops in parallel, loop `k` running klayout once
+    per line of `list-<metal_top>-<k>.txt`; the exit code is 1 when any run failed (the
+    others still run)."""
     out = CONTAINER_OUT
     switches = " ".join(shlex.quote(s) for s in [
         "-rd", f"metal_level={mapping.metal_level}", "-rd", f"metal_top={metal_top}",
         "-rd", f"decks={mapping.drc.decks}", "-rd", f"run_mode={mapping.drc.run_mode}",
         "-rd", f"workers={mapping.drc.workers}"])
-    script = (
-        f"rc=0; mkdir -p {out}/reports/{metal_top} {out}/logs/{metal_top}; "
-        f"while read -r f; do n=${{f%.gds}}; "
+    loop = (
+        f"rc=0; while read -r f; do n=${{f%.gds}}; "
         f"klayout -b -r {shlex.quote(mapping.drc.deck)} -rd input={out}/gds/$f "
         f"-rd report={out}/reports/{metal_top}/$n.lyrdb {switches} "
         f"> {out}/logs/{metal_top}/$n.log 2>&1 || {{ rc=1; echo \"klayout failed: $f\"; }}; "
-        f"done < {out}/list-{metal_top}.txt; exit $rc")
+        f"done < {out}/list-{metal_top}-$k.txt; exit $rc")
+    script = (
+        f"mkdir -p {out}/reports/{metal_top} {out}/logs/{metal_top}; pids=; "
+        f"for k in {' '.join(str(k) for k in range(jobs))}; do ( {loop} ) & pids=\"$pids $!\"; "
+        f"done; fail=0; for p in $pids; do wait $p || fail=1; done; exit $fail")
     return ["sh", "-c", script]
 
 
 def run_gf180mcu_drc_many(gds_files: list[Path], out_dir: Path, runner: Runner,
-                          mapping: Mapping, metal_top: str) -> DrcResults:
+                          mapping: Mapping, metal_top: str, jobs: int = 1) -> DrcResults:
     """Run every retargeted layout of `gds_files` through the public deck with `metal_top`
-    (one container for all cache misses) and return their results."""
+    (one container for all cache misses, `jobs` klayout processes at a time: match it to
+    the runner's CPU cap) and return their results."""
+    if jobs < 1:
+        raise ValueError(f"jobs must be at least 1: {jobs}")
     if metal_top not in mapping.drc.metal_top:
         raise ValueError(f"metal_top {metal_top!r} is not one of {mapping.drc.metal_top}")
     names = [derived_name(g) for g in gds_files]
@@ -95,9 +103,13 @@ def run_gf180mcu_drc_many(gds_files: list[Path], out_dir: Path, runner: Runner,
     if misses:
         for _, name, _ in misses:
             (reports / name).with_suffix(".lyrdb").unlink(missing_ok=True)
-        (out_dir / f"list-{metal_top}.txt").write_text(
-            "".join(f"{name}\n" for _, name, _ in misses), encoding="utf-8")
-        done = runner(gf180mcu_command(mapping, metal_top), out_dir)
+        for old in out_dir.glob(f"list-{metal_top}-*.txt"):
+            old.unlink()
+        jobs = min(jobs, len(misses))
+        for k in range(jobs):
+            (out_dir / f"list-{metal_top}-{k}.txt").write_text(
+                "".join(f"{name}\n" for _, name, _ in misses[k::jobs]), encoding="utf-8")
+        done = runner(gf180mcu_command(mapping, metal_top, jobs), out_dir)
         missing = []
         for gds, name, entry in misses:
             report = (reports / name).with_suffix(".lyrdb")

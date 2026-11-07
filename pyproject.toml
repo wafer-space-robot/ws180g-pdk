@@ -24,7 +24,7 @@ docs = ["sphinx", "myst-parser", "furo"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--strict-markers"
+addopts = "--strict-markers --basetemp=tmp/pytest"
 markers = [
     "sandbox: runs a tool in the container through build/sandbox-run (needs Docker)",
     "slow: minutes, not seconds",

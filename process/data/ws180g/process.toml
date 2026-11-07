@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: Apache-2.0
+# The ws180g process: name, grid and variants. Every number carries its provenance.
+name = "ws180g"
+schema = 1
+
+[grid]
+value = 0.005
+unit = "um"
+provenance = "chosen"
+evidence = ["gf180mcu-drm/GRID"]
+note = "provisional, spec 5.2; the least common multiple of the target grids the evidence records"
+
+# Each variant lists its gate oxides and the variants it contains.
+[variants.ws180g005]
+oxides = ["5v0"]
+contains = []
+
+[variants.ws180g035]
+oxides = ["5v0", "3v3"]
+contains = ["ws180g005"]
+
+[variants.ws180g105]
+oxides = ["5v0", "1v8"]
+contains = ["ws180g005"]
+
+[variants.ws180g135]
+oxides = ["5v0", "3v3", "1v8"]
+contains = ["ws180g005", "ws180g035", "ws180g105"]

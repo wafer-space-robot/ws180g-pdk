@@ -5,11 +5,12 @@ version = "0.0.0"
 description = "ws180g pipeline component: evidence"
 requires-python = ">=3.12"
 license = "Apache-2.0"
-dependencies = ["pydantic>=2.11"]
+dependencies = ["pydantic>=2.11", "ws180g-process"]
 
 [project.scripts]
 ws180g-import-scmos = "ws180g_evidence.import_scmos:main"
 ws180g-import-gf180mcu = "ws180g_evidence.import_gf180mcu:main"
+ws180g-evidence-report = "ws180g_evidence.report:main"
 
 [build-system]
 requires = ["hatchling"]

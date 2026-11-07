@@ -1019,12 +1019,18 @@ source = { editable = "precheck" }
 dependencies = [
     { name = "klayout" },
     { name = "pydantic" },
+    { name = "ws180g-layergen" },
+    { name = "ws180g-process" },
+    { name = "ws180g-rules" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "klayout", specifier = ">=0.30.12" },
     { name = "pydantic", specifier = ">=2.11" },
+    { name = "ws180g-layergen", editable = "layergen" },
+    { name = "ws180g-process", editable = "process" },
+    { name = "ws180g-rules", editable = "rules" },
 ]
 
 [[package]]

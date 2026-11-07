@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Shared fixtures. Later tasks add `sandbox` here as its interface
-appears."""
+"""Shared fixtures, including `sandbox` (runs a command in the container image)."""
 
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -60,3 +60,34 @@ def report(process, evidence):
     from ws180g_evidence.report import margin_report
 
     return margin_report(process, evidence)
+
+
+class Sandbox:
+    """Runs commands in the container image through `build/sandbox-run`."""
+
+    def __init__(self, repo_root: Path) -> None:
+        self.repo_root = repo_root
+        self.runner = repo_root / "build" / "sandbox-run"
+        self.image = (repo_root / "docker" / "IMAGE").read_text().splitlines()[0].strip()
+
+    def run(self, cmd: list[str], workdir: Path, mem: str = "4g",
+            cpus: int = 2) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [str(self.runner), "--mem", mem, "--cpus", str(cpus), "--workdir", str(workdir),
+             "--", *cmd],
+            capture_output=True, text=True, check=False)
+
+
+@pytest.fixture
+def sandbox(repo_root: Path) -> Sandbox:
+    """A `Sandbox`; skips the test when Docker or the image in `docker/IMAGE` is missing."""
+    docker = shutil.which("docker")
+    if docker is None:
+        pytest.skip("docker is not installed")
+    if subprocess.run([docker, "info"], capture_output=True, check=False).returncode != 0:
+        pytest.skip("the docker daemon is not reachable")
+    box = Sandbox(repo_root)
+    if subprocess.run([docker, "image", "inspect", box.image], capture_output=True,
+                      check=False).returncode != 0:
+        pytest.skip(f"image {box.image} is not built (run docker/build)")
+    return box

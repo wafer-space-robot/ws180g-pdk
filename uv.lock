@@ -1057,7 +1057,11 @@ version = "0.0.0"
 source = { editable = "tech" }
 dependencies = [
     { name = "pydantic" },
+    { name = "ws180g-process" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pydantic", specifier = ">=2.11" }]
+requires-dist = [
+    { name = "pydantic", specifier = ">=2.11" },
+    { name = "ws180g-process", editable = "process" },
+]

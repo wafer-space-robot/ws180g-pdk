@@ -15,6 +15,7 @@ from ws180g_rules.run_magic import (
     CONTAINER_OUT,
     cache_key,
     magic_rule_ids,
+    magic_script,
     parse_why,
     run_magic,
     run_magic_many,
@@ -46,6 +47,34 @@ def test_parse_why_clean():
 def test_parse_why_truncated_result_raises():
     with pytest.raises(ValueError, match="end"):
         parse_why("total 2\n2 po.w: po width < 0.24 um\n", 76)
+
+
+def test_parse_why_without_total_raises():
+    with pytest.raises(ValueError, match="total"):
+        parse_why("2 po.w: po width < 0.24 um\nend\n", 76)
+
+
+def test_parse_why_checks_the_cell_and_its_bounding_box():
+    good = "cell c_0001\nbbox -2000 -2000 360 1000\ntotal 0\nend\n"
+    assert parse_why(good, 76, cell="c_0001") == DrcResult(violations={}, categories_run=76)
+    with pytest.raises(ValueError, match="cell"):
+        parse_why(good, 76, cell="c_0002")
+    with pytest.raises(ValueError, match="cell"):
+        parse_why("bbox 0 0 10 10\ntotal 0\nend\n", 76, cell="c_0001")
+    with pytest.raises(ValueError, match="bbox"):
+        parse_why("cell c_0001\ntotal 0\nend\n", 76, cell="c_0001")
+    # Magic gives a cell with nothing in it the box 0 0 1 1
+    with pytest.raises(ValueError, match="empty"):
+        parse_why("cell c_0001\nbbox 0 0 1 1\ntotal 0\nend\n", 76, cell="c_0001")
+
+
+def test_script_records_the_cell_and_its_box():
+    script = magic_script(["c_0000"])
+    assert "set bbox [box values]" in script
+    assert 'puts $f "cell [cellname list self]"' in script
+    assert 'puts $f "bbox $bbox"' in script
+    # the box is read before it is grown
+    assert script.index("set bbox [box values]") < script.index("box grow c")
 
 
 def test_magic_rule_ids_reads_the_drc_section():
@@ -126,10 +155,15 @@ class FakeRunner:
     file per layout the script reads, with `tiles[derived stem]` error tiles of `nw.w`.
     The derived stem is found through the cell's position in the script and `names`."""
 
-    def __init__(self, tiles: dict[str, int], returncode: int = 0, write: bool = True) -> None:
+    def __init__(self, tiles: dict[str, int], returncode: int = 0, write: bool = True,
+                 log: str = "out", header: str = "cell {cell}\nbbox 0 0 2000 5000\n",
+                 total: bool = True) -> None:
         self.tiles = tiles
         self.returncode = returncode
         self.write = write
+        self.log = log
+        self.header = header
+        self.total = total
         self.calls: list[tuple[list[str], Path]] = []
         self.cells: list[list[str]] = []
 
@@ -150,9 +184,10 @@ class FakeRunner:
                 assert line in script
             if self.write:
                 n = self.tiles.get(Path(name).stem, 0)
-                text = f"total {n}\n" + (f"{n} nw.w: nw width < 1.44 um\n" if n else "")
+                text = (self.header.format(cell=cell) + (f"total {n}\n" if self.total else "")
+                        + (f"{n} nw.w: nw width < 1.44 um\n" if n else ""))
                 (workdir / "results" / f"{cell}.txt").write_text(text + "end\n")
-        return subprocess.CompletedProcess(cmd, self.returncode, "out", "err")
+        return subprocess.CompletedProcess(cmd, self.returncode, self.log, "err")
 
 
 @pytest.fixture
@@ -249,6 +284,47 @@ def test_run_many_engine_failure(tech_dir, proc, inputs, tmp):
 def test_run_many_missing_result(tech_dir, proc, inputs, tmp):
     with pytest.raises(RuntimeError, match="no result"):
         run_magic_many(tech_dir, inputs, tmp / "work", FakeRunner({}, write=False), proc)
+
+
+@pytest.mark.parametrize("log", [
+    "Reading \"c_0000\".\nError while reading cell \"c_0000\" (byte position 12)\n",
+    "Error parsing GDS-II stream\n",
+    "Unknown layer/datatype in boundary, layer=99 type=0\n",
+    "invalid command name \"drc\"\nError: script failed\n",
+])
+def test_run_many_tcl_error_in_the_log_raises(tech_dir, proc, inputs, tmp, log):
+    out = tmp / "work"
+    with pytest.raises(RuntimeError, match="magic.log"):
+        run_magic_many(tech_dir, inputs, out, FakeRunner({}, log=log), proc)
+    assert not list((out / "cache").glob("*.json"))
+    assert (out / "magic.log").read_text(encoding="utf-8").startswith(log)
+
+
+def test_run_many_clean_log_passes(tech_dir, proc, inputs, tmp):
+    log = ("Warning: Calma reading is not undoable!  I hope that's OK.\nNo errors found.\n")
+    results = run_magic_many(tech_dir, inputs, tmp / "work", FakeRunner({}, log=log), proc)
+    assert len(results) == 2
+
+
+def test_run_many_empty_cell_raises(tech_dir, proc, inputs, tmp):
+    out = tmp / "work"
+    runner = FakeRunner({}, header="cell {cell}\nbbox 0 0 1 1\n")
+    with pytest.raises(RuntimeError, match="empty"):
+        run_magic_many(tech_dir, inputs, out, runner, proc)
+    assert not list((out / "cache").glob("*.json"))
+
+
+def test_run_many_wrong_cell_raises(tech_dir, proc, inputs, tmp):
+    runner = FakeRunner({}, header="cell test\nbbox 0 0 2000 5000\n")
+    with pytest.raises(RuntimeError, match="cell"):
+        run_magic_many(tech_dir, inputs, tmp / "work", runner, proc)
+
+
+def test_run_many_missing_total_raises(tech_dir, proc, inputs, tmp):
+    out = tmp / "work"
+    with pytest.raises(RuntimeError, match="total"):
+        run_magic_many(tech_dir, inputs, out, FakeRunner({}, total=False), proc)
+    assert not list((out / "cache").glob("*.json"))
 
 
 def test_run_many_stale_result_is_not_read(tech_dir, proc, inputs, tmp):

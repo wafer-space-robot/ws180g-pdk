@@ -55,16 +55,21 @@ CIF_DRC = "drc"  # the cifoutput style of the CIF checks
 # Types of the active plane and their cifinput booleans over the drawn GDS layers (first
 # entry: the layer the type starts from). The definitions are disjoint, so the paint order
 # does not matter. ndiff/pdiff: device diffusion (nd outside, pd inside nw); nsubdiff,
-# psubdiff: well taps (nd inside, pd outside nw).
+# psubdiff: well taps (nd inside, pd outside nw). The unsilicided types use SAB_CORE, sab
+# shrunk by 1 nm: poly or diffusion ending flush with the sab edge then ends in a 1 nm
+# silicided sliver, so the end borders the silicided type, is measured by the extension
+# rule (too short) and not by the side enclosure, as in KLayout, where the "sides" are
+# never the ends and an edge on the sab edge (distance 0) is not reported.
+SAB_CORE = "sab_core"
 ACTIVE: dict[str, list[str]] = {
-    "ndiff": ["nd", "and-not nw", "and-not po,co,sab"],
-    "pdiff": ["pd", "and nw", "and-not po,co,sab"],
+    "ndiff": ["nd", "and-not nw", f"and-not po,co,{SAB_CORE}"],
+    "pdiff": ["pd", "and nw", f"and-not po,co,{SAB_CORE}"],
     "nsubdiff": ["nd", "and nw", "and-not po,co"],
     "psubdiff": ["pd", "and-not nw", "and-not po,co"],
-    "rndiff": ["nd", "and sab", "and-not nw", "and-not po,co"],
-    "rpdiff": ["pd", "and sab", "and nw", "and-not po,co"],
-    "poly": ["po", "and-not nd,pd,co,sab"],
-    "rpoly": ["po", "and sab", "and-not nd,pd,co"],
+    "rndiff": ["nd", f"and {SAB_CORE}", "and-not nw", "and-not po,co"],
+    "rpdiff": ["pd", f"and {SAB_CORE}", "and nw", "and-not po,co"],
+    "poly": ["po", f"and-not nd,pd,co,{SAB_CORE}"],
+    "rpoly": ["po", f"and {SAB_CORE}", "and-not nd,pd,co"],
     "ntransistor": ["po", "and nd", "and-not co"],
     "ptransistor": ["po", "and pd", "and-not co"],
     "ndcontact": ["co", "and nd", "and-not nw", "and-not po"],
@@ -76,8 +81,10 @@ ACTIVE: dict[str, list[str]] = {
     "fieldcontact": ["co", "and-not po,nd,pd"],
 }
 # Contact types: (type, residue on the lower plane, residue on the upper plane). The two
-# error cuts are contacts too, so the metal 1 enclosure sees them; their active residues
-# only matter for connectivity, which this DRC-only technology does not use.
+# error cuts are contacts too, so the metal 1 enclosure sees them. Their active residues
+# are arbitrary (gatecontact -> ntransistor, fieldcontact -> rpoly; Magic wants one
+# residue per plane, distinct from the other contacts'): residues only matter for
+# connectivity and painting, which this DRC-only technology reading GDS does not use.
 CONTACTS: list[tuple[str, str, str]] = [
     ("ndcontact", "ndiff", "m1"), ("pdcontact", "pdiff", "m1"),
     ("nsubdiffcontact", "nsubdiff", "m1"), ("psubdiffcontact", "psubdiff", "m1"),
@@ -290,8 +297,12 @@ def _gate_length(row: RuleRow, t: _Tech) -> Emitted:
     return ([f"gate length: from every edge between source/drain diffusion and {gate} (the",
              "gate edges on po edges) the gate must reach the value. Approximation: the",
              "transistor type follows the diffusion (po over nd or pd), the rule the well",
-             "(gate-nw, gate&nw); a gate edge on space (flush diffusion) is not measured"],
-            [f"edge4way {_list(diff)} {gate} {nm(_value(row))} allgate 0 0 {why(row)}"])
+             "(gate-nw, gate&nw); a gate edge on space (flush diffusion) is not measured.",
+             "Poly is OK beyond the gate: across a gate from a source/drain edge lies the",
+             "other source/drain, so reaching poly means the edge was an end inside the",
+             "diffusion (KLayout's gate length has no second po edge there either)"],
+            [(f"edge4way {_list(diff)} {gate} {nm(_value(row))} allgate,{_list(PO_OFF_GATE)} "
+              f"0 0 {why(row)}")])
 
 
 def _min_space(row: RuleRow, t: _Tech) -> Emitted:
@@ -307,18 +318,30 @@ def _min_space(row: RuleRow, t: _Tech) -> Emitted:
         return (["spacing: the two layers closer than the value; touching (butting) is",
                  "allowed (touching_ok, both on the active plane)"],
                 [f"spacing {_list(a)} {_list(b)} {v} touching_ok {why(row)}"])
+    if a == ["nwell"]:
+        return _well_space(row, b, v)
     comments = ["spacing: the two layers closer than the value, touching or overlapping",
                 "included (touching_illegal)"]
-    if a == ["nwell"]:
-        b = _minus(b, [*IN_NW, *GATE])
-        comments += ["the diffusion types inside nw by construction overlap it legally and",
-                     "are left out, and so are the transistors, which may sit on either side",
-                     "of the well: their source/drain diffusion carries the check"]
-    elif a == ["sab"]:
+    if a == ["sab"]:
         comments += ["Approximation: a cut inside sab is reported too (KLayout measures",
                      "facing outside edges only)"]
     return comments, [(f"spacing {_list(_minus(a, b))} {_list(b)} {v} touching_illegal "
                       f"{why(row)}")]
+
+
+def _well_space(row: RuleRow, layer: list[str], v: int) -> Emitted:
+    """`nw.s.nd`, `nw.s.pd`: nw to the diffusion outside it."""
+    outside = _minus(layer, IN_NW)
+    if layer == PD:
+        outside = _minus(outside, GATE)  # a p-gate lies inside nw
+    return (["space from nw: from every edge between the diffusion types outside nw by",
+             "construction and a type of another layer, no nwell within the value (checked",
+             "on the well plane; corners extended). A shape straddling the well edge is",
+             "split there into an inside and an outside type of the same layer, an edge",
+             "that does not trigger, so, as in KLayout, it is not a spacing error (its",
+             "enclosure rule reports it)"],
+            [(f"edge4way {_list(outside)} {_not(layer, 'active')} {v} ~(nwell)/well "
+              f"{_not(layer, 'active')} {v} {why(row)} well")])
 
 
 def _field_poly_space(row: RuleRow, t: _Tech) -> Emitted:
@@ -380,8 +403,10 @@ def _min_enclosure(row: RuleRow, t: _Tech) -> Emitted:
     v = nm(_value(row))
     outer, inner = _types(row, 0), _types(row, 1)
     plane = plane_of(outer[0])
-    if plane.startswith("metal"):
+    if plane.startswith("metal") and any(c in images_on(plane) for c in inner):
         cuts = [c for c in inner if c in images_on(plane)]
+        if cuts != inner:
+            raise ValueError(f"{row.id}: inner types {inner} are not all cuts on {plane}")
         return (["surround: the metal (the metal type and every contact image on its plane,",
                  "stacked contacts included) must surround the cut images by the value, so a",
                  "cut straddling the metal edge is reported. Approximation: absence_illegal,",
@@ -391,6 +416,8 @@ def _min_enclosure(row: RuleRow, t: _Tech) -> Emitted:
     if plane == "active":
         # the cut types that lie on the outer layer by construction
         cuts = [c for c in inner if c in outer]
+        if not cuts:
+            raise ValueError(f"{row.id}: no cut type of {inner} lies on {outer}")
         others = _minus(CO, cuts)
         return (["surround: the cut types that lie on the outer layer by construction must be",
                  "surrounded by its other types by the value (absence_illegal). A cut",
@@ -402,9 +429,11 @@ def _min_enclosure(row: RuleRow, t: _Tech) -> Emitted:
                   f"{why(row)}"),
                  (f"edge4way {_list(cuts)} {_list(others)} {STRADDLE[str(row.layers[0])]} "
                   f"0 0 0 {why(row)}")])
-    return (["surround: where the outer layer is present, it must surround the inner types",
-             "by the value; an inner shape straddling the outer edge is reported, one wholly",
-             "outside is legal (absence_ok, as the KLayout check)"],
+    if any(plane_of(c) == plane for c in inner):
+        raise ValueError(f"{row.id}: no Magic enclosure of {inner} by {outer} on one plane")
+    return (["surround across planes: where the outer layer is present, it must surround",
+             "the inner types by the value; an inner shape straddling the outer edge is",
+             "reported, one wholly outside is legal (absence_ok, as the KLayout check)"],
             [f"surround {_list(inner)} {_list(outer)} {v} absence_ok {why(row)}"])
 
 
@@ -415,8 +444,8 @@ def _side_enclosure(row: RuleRow, t: _Tech) -> Emitted:
     return (["enclosure of the sides only: from every edge between the unsilicided type and",
              "a type of another layer (the sides; the crossing ends border the silicided",
              "part of the same layer and are not checked) the region within the value must",
-             "be sab (checked on the sab plane). Approximation: an end flush with the sab",
-             "edge is reported here as well as by the extension rule"],
+             "be sab (checked on the sab plane); an end flush with the sab edge borders the",
+             "1 nm silicided sliver and is left to the extension rule"],
             [(f"edge4way {_list(inner)} {_not(layer, 'active')} {nm(_value(row))} sab 0 0 "
              f"{why(row)} sab")])
 
@@ -438,12 +467,18 @@ def _gate_extension(row: RuleRow, t: _Tech, a: str) -> Emitted:
     return ([f"extension beyond the gate: from every edge between a transistor and {a}",
              f"outside the gate, {a} must continue for the value; a CIF check adds {a}",
              f"ending flush with the {partner_name} edge (a gate edge on space whose strip",
-             f"touches {partner_name} outside the gate). Approximation: Magic tells a gate's",
-             "sides apart only by the neighbouring type, so an end inside the partner is",
-             "measured as a side, against the other extension rule and the gate length;",
-             f"{a} ending inside {partner_name} is not reported as {row.id}"],
+             f"touches {partner_name} outside the gate); and {a} ending inside",
+             f"{partner_name}: from an edge between {partner_name} and a transistor, where",
+             f"{partner_name} also lies beyond the edge's end on its own side (it wraps round",
+             "the gate corner, corner types), the corner region beyond the end on the gate",
+             f"side must be gate: it is {partner_name} when the end of {a} lies inside.",
+             "Approximation: Magic tells a gate's sides apart only by the neighbouring type,",
+             "so an end inside the partner is also measured as a side by the other",
+             "extension rule (see MAGIC_EXCEPTIONS)"],
             [f"edge4way allgate {_list(beyond)} {v} {_list(ok)} 0 0 {why(row)}",
-             f"cifmaxwidth {flush} 0 bend_illegal {why(row)}"])
+             f"cifmaxwidth {flush} 0 bend_illegal {why(row)}",
+             (f"edge4way {_list(partner)} allgate 1 allgate {_list(partner)} 1 "
+              f"{why(row)}")])
 
 
 def _min_extension(row: RuleRow, t: _Tech) -> Emitted:
@@ -456,18 +491,13 @@ def _min_extension(row: RuleRow, t: _Tech) -> Emitted:
     inner = EXPR_TYPES["po&sab" if a == "po" else f"({a})&sab"]
     layer = PO if a == "po" else DF
     outside = _minus(layer, inner)
-    tag = "po" if a == "po" else "df"
-    flush = t.templayer(f"{tag}_flush_sab", f"unsilicided {tag} ending flush with the sab "
-                        "edge: the 1 nm strip beside its edges on other layers, outside sab",
-                        [_list(inner), f"bloat-or {_list(inner)} * 1 {_list(layer)} 0",
-                         f"and-not {_list(inner)}", "and-not sab"])
     return ([f"extension beyond sab: from every edge between unsilicided and silicided {a}",
-             f"(the sab crossing) the silicided {a} must continue for the value; a CIF",
-             f"check adds unsilicided {a} ending flush with the sab edge (an edge rule on",
-             "the same edges would be merged by Magic into the side enclosure rule)"],
+             f"(the sab crossing) the silicided {a} must continue for the value. The",
+             "unsilicided types end 1 nm inside sab, so the edge lies 1 nm inside the sab",
+             f"edge and the value is met with 1 nm to spare; {a} ending flush with the sab",
+             "edge ends in the 1 nm silicided sliver and is reported as too short"],
             [(f"edge4way {_list(inner)} {_list(outside)} {nm(_value(row))} {_list(outside)} "
-              f"0 0 {why(row)}"),
-             f"cifmaxwidth {flush} 0 bend_illegal {why(row)}"])
+              f"0 0 {why(row)}")])
 
 
 def _min_area(row: RuleRow, t: _Tech) -> Emitted:
@@ -532,7 +562,8 @@ MAGIC_KINDS: dict[str, MagicKind] = {
         "edge4way <source/drain diffusion> <transistor> <v> allgate 0 0", _gate_length),
     "min-space": MagicKind(
         "spacing <a> <a> <v> touching_ok; two layers: spacing <a> <b> <v> touching_illegal, "
-        "touching_ok where butting is allowed", _min_space),
+        "touching_ok where butting is allowed; from nw: edge4way <diffusion outside nw> "
+        "~(<layer>) <v> ~(nwell)/well (on the well plane)", _min_space),
     "min-space:edges=exclude": MagicKind(
         "edge4way <field poly> ~(allpoly) <v> ~(alldf) ~(allpoly) <v>", _field_poly_space),
     "min-space:gate+endcap": MagicKind(
@@ -543,14 +574,18 @@ MAGIC_KINDS: dict[str, MagicKind] = {
         "CIF: cifspacing sab <regions not overlapping sab (bloat-all)> <v> touching_illegal",
         _unrelated_space),
     "min-enclosure": MagicKind(
-        "surround <inner> <outer> <v> absence_ok (absence_illegal for cuts on active)",
+        "metal: surround <cuts>/<plane> *<metal> <v> absence_illegal; active: surround "
+        "<cuts on the layer> <its other types> <v> absence_illegal and an edge4way for a "
+        "straddling cut; across planes: surround <inner> <outer> <v> absence_ok",
         _min_enclosure),
     "min-enclosure:edges=sides": MagicKind(
         "edge4way <unsilicided type> ~(<its layer>) <v> sab 0 0 (on the sab plane)",
         _side_enclosure),
     "min-extension": MagicKind(
-        "edge4way <inside part> <outside part> <v> <layer> 0 0; beyond gate also CIF flush "
-        "and inside-end checks (cifmaxwidth 0), beyond sab an edge4way for the flush end",
+        "edge4way <inside part> <outside part> <v> <layer> 0 0; beyond gate also a CIF "
+        "flush check (cifmaxwidth 0) and an edge4way with corner types for an end inside "
+        "the partner; beyond sab, the unsilicided types end 1 nm inside sab, so a flush "
+        "end is too short",
         _min_extension),
     "min-area": MagicKind("area <types> <v nm2> <horizon>", _min_area),
     "exact-size": MagicKind("width <cut> <v> and maxwidth <cut> <v> both", _exact_size),
@@ -576,6 +611,36 @@ MAGIC_KINDS: dict[str, MagicKind] = {
     "topology:cut_ortho": MagicKind(
         "KLayout-only: Magic stores only Manhattan and 45-degree geometry"),
 }
+
+
+@dataclass(frozen=True)
+class MagicException:
+    """A Task 14 fixture where Magic's rule ids differ from the KLayout markers after a real
+    attempt at an idiom that matches: `expected` is Magic's set, `reason` why it differs,
+    `own_id_missed` whether Magic misses the fixture's own rule (a known Magic gap)."""
+
+    expected: frozenset[str]
+    reason: str
+    own_id_missed: bool = False
+
+
+MAGIC_EXCEPTIONS: dict[tuple[str, str], MagicException] = {
+    ("po.x.df", "end_inside"): MagicException(
+        frozenset({"po.x.df", "df.x.po"}),
+        "po ends inside df: Magic finds it (the corner rule of po.x.df), but the gate's end "
+        "edge borders diffusion like a source/drain edge, so df.x.po also measures the "
+        "diffusion beyond the poly end against its 0.48 um; an edge rule cannot tell the "
+        "two apart and cannot withdraw another rule's error"),
+}
+
+
+def magic_markers(fixture) -> set[str]:
+    """The rule ids Magic reports on a Task 14 fixture (`ws180g_rules.fixtures.Fixture`):
+    those of `fixture.markers()`, unless `MAGIC_EXCEPTIONS` records Magic's own set."""
+    exception = MAGIC_EXCEPTIONS.get((fixture.rule_id, fixture.name))
+    if exception is not None and fixture.expect == "fail":
+        return set(exception.expected)
+    return set(fixture.markers())
 
 
 def magic_key(row: RuleRow) -> str:
@@ -635,7 +700,9 @@ def _source(magic_type: str) -> list[str]:
 
 
 def _cifinput(layers, planes) -> list[str]:
-    lines = ["cifinput", "style gds", " scalefactor 1 nanometers", ""]
+    lines = ["cifinput", "style gds", " scalefactor 1 nanometers", "",
+             " # sab shrunk by 1 nm: the area of the unsilicided types (see ACTIVE)",
+             f" templayer {SAB_CORE} sab", "  shrink 1", ""]
     for _, types in planes:
         for magic_type in types:
             ops = _source(magic_type)

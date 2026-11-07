@@ -12,7 +12,14 @@ from pathlib import Path
 import klayout.db as kdb
 import pytest
 from ws180g_rules.table import RuleTable
-from ws180g_tech.magic import MAGIC_KINDS, magic_key, main, write_magic_tech
+from ws180g_tech.magic import (
+    MAGIC_EXCEPTIONS,
+    MAGIC_KINDS,
+    magic_key,
+    magic_markers,
+    main,
+    write_magic_tech,
+)
 
 VARIANT = "ws180g005"
 WHY = re.compile(r'"([A-Za-z0-9_.]+): ')
@@ -76,8 +83,32 @@ def test_width_in_nanometres(tech):
 
 
 def test_every_magic_rule_has_a_why(tech, table):
+    # A why per id cannot catch a dead rule (one that never fires, such as a surround of an
+    # empty type list); test_no_empty_type_list and the sandbox probes and fixtures do.
     magic = {r.id for r in table.checkable() if "magic" in r.engines}
     assert magic and magic == _why_ids(_section(tech, "drc"))
+
+
+def test_no_empty_type_list(tech):
+    drc = _section(tech, "drc")
+    rules = [ln for ln in drc.splitlines() if ln.strip() and not ln.lstrip().startswith("#")]
+    assert not [ln for ln in rules if "()" in ln or ",," in ln or " ," in ln]
+
+
+def test_pad_enclosure_is_a_cross_plane_surround(tech):
+    assert re.search(r'^ *surround pad \*mtop 3000 absence_ok "mtop.e.pad', tech, re.MULTILINE)
+
+
+def test_magic_markers(tmp):
+    from ws180g_rules.fixtures import Fixture
+
+    for (rid, name), exception in MAGIC_EXCEPTIONS.items():
+        assert exception.reason and rid in exception.expected or exception.own_id_missed
+        fail = Fixture(rid, name, tmp / "x.gds", "fail")
+        assert magic_markers(fail) == set(exception.expected)
+        assert magic_markers(Fixture(rid, name, tmp / "x.gds", "pass")) == set()
+    plain = Fixture("po.w", "min_minus_grid", tmp / "x.gds", "fail")
+    assert magic_markers(plain) == set(plain.markers()) == {"po.w"}
 
 
 def test_klayout_only_rules_are_listed_not_emitted(tech, table):
@@ -291,16 +322,16 @@ MAGIC_PROBES: dict[str, tuple[list[tuple[str, int, int, int, int]], set[str]]] =
     "field_po_near_df": ([("nd", 0, 0, 1000, 1000), ("po", 1300, 0, 1540, 1000)],
                          {"po.s.df"}),
     "po_flush": ([("nd", 0, 0, 2000, 1000), ("po", 640, -400, 1360, 1000)], {"po.x.df"}),
-    # differs: KLayout {po.x.df}; Magic measures the end inside df as a gate side
+    # differs: KLayout {po.x.df}; the end inside df is also measured as a source/drain
+    # side by df.x.po (MAGIC_EXCEPTIONS)
     "po_inside": ([("nd", 0, 0, 2000, 1000), ("po", 640, -400, 1360, 700)],
-                  {"df.x.po", "po.l.n"}),
+                  {"po.x.df", "df.x.po"}),
     "df_flush": ([("nd", 0, 0, 1360, 1000), ("po", 640, -400, 1360, 1400)], {"df.x.po"}),
-    # differs: KLayout {df.x.po}; as po_inside
+    # differs: KLayout {df.x.po}; as po_inside, the end inside po is also measured by po.x.df
     "df_inside": ([("nd", 0, 0, 1200, 1000), ("po", 640, -400, 1360, 1400)],
-                  {"po.x.df", "po.l.n"}),
-    # differs: KLayout {po.x.sab, sab.area}; Magic's side enclosure also sees the flush end
+                  {"df.x.po", "po.x.df"}),
     "po_sab_flush": ([("sab", 0, 0, 1000, 2000), ("po", 300, -1000, 540, 2000)],
-                     {"po.x.sab", "sab.e.po", "sab.area"}),
+                     {"po.x.sab", "sab.area"}),
     "po_sab_inside": ([("sab", 0, 0, 1000, 2000), ("po", 300, -1000, 540, 1500)],
                       {"sab.area"}),
     "nd_wholly_in_sab": ([("sab", 0, 0, 1800, 1800), ("nd", 400, 400, 1400, 1400)], set()),
@@ -313,9 +344,8 @@ MAGIC_PROBES: dict[str, tuple[list[tuple[str, int, int, int, int]], set[str]]] =
     "po_abutting_df": ([("nd", 0, 0, 1000, 1000), ("po", 1000, 0, 1240, 1000)], {"po.s.df"}),
     "po_sab_legal": ([("sab", 0, 0, 1000, 2000), ("po", 300, -1000, 540, 3000)],
                      {"sab.area"}),
-    # differs: KLayout {df.x.sab}; as po_sab_flush
     "df_sab_flush": ([("sab", 0, 0, 2000, 2000), ("nd", 300, -1000, 1300, 2000)],
-                     {"df.x.sab", "sab.e.df"}),
+                     {"df.x.sab"}),
     "hanging_co": ([("m1", 0, 0, 1000, 1000), ("co", 900, 300, 1120, 520)],
                    {"m1.e.co", "co.in"}),
     "legal_outside": ([("nw", 5000, 0, 8000, 3000), ("nd", 0, 0, 1000, 1000),
@@ -332,9 +362,15 @@ MAGIC_PROBES: dict[str, tuple[list[tuple[str, int, int, int, int]], set[str]]] =
     "stacked_co_v1": ([("nd", 0, 0, 2000, 2000), ("co", 890, 890, 1110, 1110),
                        ("m1", 500, 500, 1500, 1500), ("v1", 865, 865, 1135, 1135),
                        ("m2", 500, 500, 1500, 1500)], set()),
-    # differs: KLayout {nw.e.pd}; Magic's spacing also sees the outside part touch nw
     "nw_pd_straddle": ([("nw", 0, 0, 5000, 5000), ("pd", 4500, 1000, 5500, 2000)],
-                       {"nw.e.pd", "nw.s.pd"}),
+                       {"nw.e.pd"}),
+    "nw_nd_straddle": ([("nw", 0, 0, 5000, 5000), ("nd", 4500, 1000, 5500, 2000)],
+                       {"nw.e.nd"}),
+    "pad_ok": ([("mtop", 0, 0, 66000, 306000), ("pad", 3000, 3000, 63000, 303000)], set()),
+    "pad_close": ([("mtop", 0, 0, 66000, 306000), ("pad", 3000, 3000, 63005, 303000)],
+                  {"mtop.e.pad"}),
+    "pad_straddle": ([("mtop", 0, 0, 66000, 306000), ("pad", 3000, 3000, 70000, 303000)],
+                     {"mtop.e.pad"}),
     "nw_pd_close": ([("nw", 0, 0, 5000, 5000), ("pd", 3500, 1000, 4500, 2000)], {"nw.e.pd"}),
     "nw_nd_close": ([("nw", 0, 0, 5000, 5000), ("nd", 1000, 1000, 4645, 2000)], {"nw.e.nd"}),
     "nw_nd_near": ([("nw", 0, 0, 5000, 5000), ("nd", 5500, 1000, 6500, 2000)], {"nw.s.nd"}),

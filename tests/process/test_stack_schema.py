@@ -77,5 +77,25 @@ def test_stack_errors_are_reported_per_entry(data_copy):
 
 def test_litho_of_an_unknown_layer_is_an_error(data_copy):
     path = data_copy / "stack.toml"
-    path.write_text(path.read_text().replace("[stack.litho.sab]", "[stack.litho.nosuch]"))
+    path.write_text(path.read_text().replace("[stack.litho.sab", "[stack.litho.nosuch"))
     assert any(line.startswith("stack.toml: stack.litho.nosuch:") for line in _lines(data_copy))
+
+
+def test_a_missing_or_unknown_stack_table_is_an_error(data_copy):
+    path = data_copy / "stack.toml"
+    path.write_text(path.read_text().replace("[stack.supplies.", "[stack.supply."))
+    lines = _lines(data_copy)
+    assert "stack.toml: stack.supply: unknown key" in lines
+    assert "stack.toml: stack.supplies: missing" in lines
+
+
+def test_a_stack_table_that_is_not_a_table_is_an_error(data_copy):
+    path = data_copy / "stack.toml"
+    text = path.read_text().replace("[stack.litho.", "[stack.lithox.")
+    path.write_text(text.replace("[stack.metals]\n", "[stack.metals]\n\n[stack]\nlitho = 5\n", 1))
+    assert any(line.startswith("stack.toml: stack.litho:") for line in _lines(data_copy))
+
+
+def test_masks_that_are_not_a_list_are_an_error(data_copy):
+    (data_copy / "masks.toml").write_text("# SPDX-License-Identifier: Apache-2.0\nmasks = 5\n")
+    assert any(line.startswith("masks.toml: masks:") for line in _lines(data_copy))

@@ -10,9 +10,9 @@ from decimal import Decimal
 from pathlib import Path
 from typing import get_args, get_origin
 
-from pydantic import TypeAdapter, ValidationError
+from pydantic import BaseModel, TypeAdapter, ValidationError
 
-from ws180g_process.model import Datatypes, Layer, Process, Variant
+from ws180g_process.model import Datatypes, Layer, Mask, Process, Variant
 from ws180g_process.ranges import on_grid
 
 DEFAULT_DATA = Path(__file__).resolve().parents[2] / "data" / "ws180g"
@@ -72,6 +72,10 @@ def load_process(data_dir: Path = DEFAULT_DATA) -> Process:
     known = set(raw_variants) if isinstance(raw_variants, dict) else set()
     errors += _check_variants(valid.get("variants", {}), known)
     errors += _check_layers(valid.get("layers", {}), known, valid.get("datatypes"))
+    raw_layers = data.get("layers")
+    layer_names = set(raw_layers) if isinstance(raw_layers, dict) else set()
+    errors += _check_masks(valid.get("masks", []), layer_names, valid.get("layers", {}), known)
+    errors += _check_litho(valid.get("stack", {}).get("litho", {}), layer_names)
     if errors:
         errors.sort(key=lambda e: FILES.index(e.file) if e.file in FILES else len(FILES))
         raise ProcessError.collected(errors)
@@ -126,22 +130,70 @@ def _validate_keys(
             if file in read_files and info.is_required():
                 errors.append(ProcessError(file, key, "missing"))
             continue
-        if get_origin(info.annotation) is dict and isinstance(data[key], dict):
-            entry_type = get_args(info.annotation)[1]
-            entries = {}
-            for entry, value in data[key].items():
-                try:
-                    entries[entry] = TypeAdapter(entry_type).validate_python(value)
-                except ValidationError as exc:
-                    errors += _from_validation(exc, origin, prefix=(key, entry))
-            valid[name] = entries
-            continue
-        try:
-            adapter = TypeAdapter(info.annotation)
-            valid[name] = adapter.validate_python(data[key])
-        except ValidationError as exc:
-            errors += _from_validation(exc, origin, prefix=(key,))
+        result, key_errors = _validate(info.annotation, data[key], (key,), origin)
+        errors += key_errors
+        if result is not None:  # None: the value failed as a whole
+            valid[name] = result
     return valid, errors
+
+
+def _validate(
+    annotation, value, loc: tuple, origin: dict[str, str]
+) -> tuple[object, list[ProcessError]]:
+    """Validate `value` against `annotation`, splitting it where it is a collection of
+    entries so that each entry is checked on its own: a `dict[str, X]` table entry by entry,
+    a `list[X]` item by item (an item that fails is `None` in the result), and a table of
+    such tables (`Stack`) field by field. Return what validated (`None` when the value
+    failed as a whole) and every error."""
+    errors: list[ProcessError] = []
+    container = get_origin(annotation)
+    if container is dict and isinstance(value, dict):
+        entry_type = get_args(annotation)[1]
+        entries = {}
+        for entry, item in value.items():
+            result, item_errors = _validate(entry_type, item, loc + (entry,), origin)
+            errors += item_errors
+            if not item_errors:
+                entries[entry] = result
+        return entries, errors
+    if container is list and isinstance(value, list):
+        item_type = get_args(annotation)[0]
+        items = []
+        for index, item in enumerate(value):
+            result, item_errors = _validate(item_type, item, loc + (index,), origin)
+            errors += item_errors
+            items.append(None if item_errors else result)
+        return items, errors
+    if _is_table_of_tables(annotation) and isinstance(value, dict):
+        fields = {}
+        file = origin.get(str(loc[0])) or KEY_FILE.get(str(loc[0]), "process.toml")
+        dotted = ".".join(str(part) for part in loc)
+        for extra in (k for k in value if k not in annotation.model_fields):
+            errors.append(ProcessError(file, f"{dotted}.{extra}", "unknown key"))
+        for field, info in annotation.model_fields.items():
+            if field not in value:
+                if info.is_required():
+                    errors.append(ProcessError(file, f"{dotted}.{field}", "missing"))
+                continue
+            result, field_errors = _validate(
+                info.annotation, value[field], loc + (field,), origin)
+            errors += field_errors
+            if result is not None:
+                fields[field] = result
+        return fields, errors
+    try:
+        return TypeAdapter(annotation).validate_python(value), errors
+    except ValidationError as exc:
+        return None, _from_validation(exc, origin, prefix=loc)
+
+
+def _is_table_of_tables(annotation: object) -> bool:
+    """A model whose every field is a `dict[str, X]` table and that has no model-level rule,
+    so validating it field by field loses nothing."""
+    return (
+        isinstance(annotation, type) and issubclass(annotation, BaseModel)
+        and not annotation.__pydantic_decorators__.model_validators
+        and all(get_origin(f.annotation) is dict for f in annotation.model_fields.values()))
 
 
 def _from_validation(
@@ -215,3 +267,35 @@ def _check_layers(
                 "layers.toml", f"layers.{name}.gds", f"{layer.gds} is also {seen[layer.gds]}"))
         seen[layer.gds] = name
     return errors
+
+
+def _check_masks(
+    masks: list[Mask | None], layer_names: set[str], layers: dict[str, Layer], known: set[str]
+) -> list[ProcessError]:
+    """Each mask is a layer of the layer map, listed once, drawn exactly when its layer is,
+    and names a known variant."""
+    errors = []
+    seen: dict[str, int] = {}
+    for index, mask in enumerate(masks):
+        if mask is None:  # its schema error is already reported
+            continue
+        key = f"masks.{index}"
+        if mask.name not in layer_names:
+            errors.append(ProcessError("masks.toml", f"{key}.name", f"{mask.name} is not a layer"))
+        if mask.name in seen:
+            errors.append(ProcessError(
+                "masks.toml", f"{key}.name", f"duplicate of masks.{seen[mask.name]} ({mask.name})"))
+        seen.setdefault(mask.name, index)
+        layer = layers.get(mask.name)
+        if layer is not None and mask.drawn != (layer.kind == "drawn"):
+            errors.append(ProcessError(
+                "masks.toml", f"{key}.drawn", f"{mask.name} is a {layer.kind} layer"))
+        if mask.variant is not None and mask.variant not in known:
+            errors.append(ProcessError(
+                "masks.toml", f"{key}.variant", f"unknown variant {mask.variant}"))
+    return errors
+
+
+def _check_litho(litho: dict, layer_names: set[str]) -> list[ProcessError]:
+    return [ProcessError("stack.toml", f"stack.litho.{name}", "not a layer")
+            for name in litho if name not in layer_names]

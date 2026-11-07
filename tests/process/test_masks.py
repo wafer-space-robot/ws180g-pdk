@@ -57,7 +57,8 @@ def test_a_duplicate_mask_is_an_error(data_copy):
 
 
 def test_a_mask_drawn_flag_must_match_its_layer(data_copy):
-    _replace(data_copy / "masks.toml", 'name = "nsel"\ndrawn = false', 'name = "nsel"\ndrawn = true')
+    _replace(data_copy / "masks.toml", 'name = "nsel"\ndrawn = false',
+             'name = "nsel"\ndrawn = true')
     assert any(line.startswith("masks.toml: masks.") and "nsel" in line
                for line in _lines(data_copy))
 

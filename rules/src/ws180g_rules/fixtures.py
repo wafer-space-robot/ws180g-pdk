@@ -653,10 +653,17 @@ def _v4_array(row: RuleRow, k: Kit) -> list[Case]:
 
 
 def _grid(row: RuleRow, k: Kit) -> list[Case]:
+    """An m1 box on the grid (pass), one with an edge 2 dbu off it (fail), and an nd and a pd
+    with a 45 degree corner (pass, `grid_45`): sizing that edge by rules.sel.x lands off the
+    grid unless layergen snaps the selects."""
     good, bad = Cell(), Cell()
     good.box("m1", 0, 0, 2 * UM, 2 * UM)
     bad.box("m1", 0, 0, 2 * UM + 2, 2 * UM)  # the right edge 2 dbu off the grid
-    return [("pass", "grid", good), ("fail", "grid", bad)]
+    chamfered = Cell()
+    for layer, x0 in (("nd", 0), ("pd", 6 * UM)):
+        chamfered.polygon(layer, [(x0, 0), (x0 + 3 * UM, 0), (x0 + 3 * UM, 2 * UM),
+                                  (x0 + UM, 2 * UM), (x0, UM)])
+    return [("pass", "grid", good), ("fail", "grid", bad), ("pass", "grid_45", chamfered)]
 
 
 def _angle(row: RuleRow, k: Kit) -> list[Case]:

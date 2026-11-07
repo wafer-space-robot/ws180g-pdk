@@ -278,3 +278,21 @@ def test_v4_array_has_a_staggered_fail_fixture(fixtures, proc):
     assert v4.count() == 4
     s = int(proc.rules["v4.s"].value * 1000)
     assert not v4.sized(s // 2).merged().non_rectangles().is_empty()
+
+
+def test_grid_pass_fixture_with_45_degree_diffusions(fixtures, proc, tmp_path):
+    """The grid rule's `grid_45` pass fixture draws an nd and a pd with a 45 degree corner,
+    whose selects layergen sizes (and snaps): every generated vertex is on the grid."""
+    from ws180g_layergen.derive import derive_file
+
+    f = _get(fixtures, "grid", "pass", "grid_45")
+    layers = _layers(f.path, proc)
+    for name in ("nd", "pd"):
+        assert any(e.dx() and e.dy() for e in layers[name].edges()), name
+    derived = tmp_path / "grid_45.gds"
+    derive_file(f.path, derived, proc)
+    generated = _layers(derived, proc)
+    for name in ("nsel", "psel"):
+        assert not generated[name].is_empty(), name
+        assert all(p.x % GRID == 0 and p.y % GRID == 0 for poly in generated[name].each()
+                   for p in poly.each_point_hull()), name

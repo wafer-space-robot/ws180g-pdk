@@ -385,12 +385,19 @@ def _drawn(d: _Deck) -> str:
                     "the drawn input layers (the generated ones are written by layergen)")
 
 
+def _all(d: _Deck) -> str:
+    names = [n for n, layer in d.layers.items() if layer.kind in ("drawn", "generated")]
+    return d.helper("all_layers", f"[{', '.join(names)}]",
+                    "every drawn and generated input layer")
+
+
 def _grid(row: RuleRow, d: _Deck) -> Emitted:
     _arity(row, 0)
     g = _um(d.process.grid.value)
-    return (["off-grid vertices of every drawn layer (generated layers are skipped: sizing",
-             "a 45 degree edge in layergen may land off the grid)"],
-            f"{_drawn(d)}.map {{ |l| l.ongrid({g}) }}.inject(:+)")
+    return (["off-grid vertices of every drawn and generated layer (layergen snaps the",
+             "generated layers to the grid, so a 45 degree edge sized by rules.sel.x stays on",
+             "it)"],
+            f"{_all(d)}.map {{ |l| l.ongrid({g}) }}.inject(:+)")
 
 
 def _angle(row: RuleRow, d: _Deck) -> Emitted:

@@ -177,7 +177,8 @@ def _min_width(row: RuleRow, d: _Deck) -> Emitted:
                     f"polygons of {a} with an edge longer than {match[1]} um")
     return ([f"condition {row.condition!r}: the width check applies to the polygons with an",
              "edge longer than the threshold. Approximation: the whole polygon is checked,",
-             "short branches included, so the check is conservative"],
+             "so a short branch narrower than the value (but at least rules.mtop.w) of a",
+             "polygon with one long edge is a false positive"],
             f"{long}.width({v}, euclidian)")
 
 
@@ -199,6 +200,15 @@ def _min_space(row: RuleRow, d: _Deck) -> Emitted:
                   "value, outside the polygons"],
                 f"{d.expr(row.layers[0])}.space({v}, euclidian)")
     a, b = (d.expr(e) for e in _arity(row, 2))
+    if row.edges == "exclude":
+        el = d.expr(d.parse(row.edge_layer))
+        own = d.helper(f"{a}_edges_not_{el}", f"{a}.edges - {el}.edges",
+                       f"edges of {a} except those shared with {el}")
+        return ([f"separation from the edges of {a} except those shared with {el} (edges =",
+                 "\"exclude\"): edge-to-edge, facing outside edges closer than the value"],
+                f"{own}.separation({b}.edges, {v}, euclidian)")
+    if row.edges is not None:
+        raise ValueError(f"{row.id}: unsupported edges {row.edges!r} for min-space")
     check = f"{a}.separation({b}, {v}, euclidian)"
     if row.id not in BUTTING_ALLOWED:
         return (["separation: facing outside edges of the two layers closer than the value"],
@@ -212,10 +222,15 @@ def _min_space(row: RuleRow, d: _Deck) -> Emitted:
 def _min_enclosure(row: RuleRow, d: _Deck) -> Emitted:
     outer, inner = (d.expr(e) for e in _arity(row, 2))
     v = _um(_value(row))
+    straddle = d.helper(f"{inner}_across_{outer}",
+                        f"{inner}.overlapping({outer}).not_inside({outer})",
+                        f"{inner} straddling the {outer} edge (partly inside, partly outside; "
+                        f"{inner} wholly outside {outer} is legal here)")
     if row.edges is None:
         return (["enclosure: inner edges inside the outer layer closer than the value to its",
-                 "edges"],
-                f"{outer}.enclosing({inner}, {v}, euclidian)")
+                 "edges (edge pairs, as polygons), OR the inner shapes that straddle the outer",
+                 "edge, which enclosing does not report"],
+                f"({outer}.enclosing({inner}, {v}, euclidian).polygons | {straddle})")
     if row.edges != "sides":
         raise ValueError(f"{row.id}: unsupported edges {row.edges!r}")
     el = d.expr(d.parse(row.edge_layer))
@@ -224,19 +239,45 @@ def _min_enclosure(row: RuleRow, d: _Deck) -> Emitted:
                      f"crossing ends lie on {outer} edges)")
     return ([f"enclosure of the sides only: the {row.edge_layer} edges of the inner layer",
              f"must be at least the value inside the {outer} edges; edges at 90 degrees",
-             "(the crossing ends) are ignored by the check"],
-            f"{sides}.enclosed({outer}.edges, {v}, euclidian)")
+             "(the crossing ends) are ignored by the check; OR the inner shapes that",
+             "straddle the outer edge"],
+            f"({sides}.enclosed({outer}.edges, {v}, euclidian).polygons | {straddle})")
+
+
+def _partner(row: RuleRow, d: _Deck, a_expr: LayerExpr, b_expr: LayerExpr) -> LayerExpr:
+    """The layer whose boundary `a` must cross: `b` itself, or for `b = gate` (po & df) the
+    other operand of the gate."""
+    if b_expr != Name("gate"):
+        return b_expr
+    po, df = d.parse("po"), d.parse("df")
+    if a_expr not in (po, df):
+        raise ValueError(f"{row.id}: an extension beyond gate needs po or df, not {a_expr}")
+    return df if a_expr == po else po
 
 
 def _min_extension(row: RuleRow, d: _Deck) -> Emitted:
     a_expr, b_expr = _arity(row, 2)
-    a = d.expr(a_expr)
+    p_expr = _partner(row, d, a_expr, b_expr)
+    a, p = d.expr(a_expr), d.expr(p_expr)
     ab = d.expr(Intersection(a_expr, b_expr))
-    cross = d.helper(f"{ab}_cross", f"{ab}.edges - {a}.edges",
-                     f"edges of {ab} not on {a} edges: where {a} crosses out of {b_expr}")
-    return ([f"extension: {a} must reach at least the value beyond each crossing edge of",
-             f"{ab}; the crossing edges are checked as enclosed by the {a} edges (end cap)"],
-            f"{cross}.enclosed({a}.edges, {_um(_value(row))}, euclidian)")
+    p_ends = d.helper(f"{p}_ends_in_{a}", f"{p}.edges.inside({a})",
+                      f"edges of {p} wholly inside {a}: {p} ending inside {a}")
+    cross = d.helper(f"{ab}_on_{p}", f"{ab}.edges & {p}.edges - {a}.edges - {p_ends}",
+                     f"edges of {ab} on {p} edges where {a} crosses the {p} boundary: "
+                     f"without the flush ends (on {a} edges) and the ends of {p} inside {a}")
+    flush = d.helper(f"{a}_flush_on_{p}", f"{a}.edges.inside({p}.edges).interacting({ab})",
+                     f"edges of {a} lying wholly on {p} edges next to {ab}: {a} ending "
+                     f"flush with the {p} boundary (extension 0)")
+    short = d.helper(f"{a}_ends_in_{p}", f"{a}.edges.inside({p})",
+                     f"edges of {a} wholly inside {p}: {a} ending inside {p} (negative "
+                     "extension)")
+    return ([f"extension: {a} must reach at least the value beyond each edge where it crosses",
+             f"the {p} boundary (those edges enclosed by the {a} edges), OR {a} ends flush on",
+             f"the {p} boundary, OR {a} ends inside {p} (a jog of {a} wholly inside {p} is",
+             "reported too). Markers as edges, merged so a flush end counted by",
+             "both selections gives one marker (inside() also takes edges on the boundary)"],
+            (f"({cross}.enclosed({a}.edges, {_um(_value(row))}, euclidian).edges | {flush} | "
+            f"{short}).merged"))
 
 
 def _min_area(row: RuleRow, d: _Deck) -> Emitted:
@@ -260,9 +301,11 @@ def _exact_size(row: RuleRow, d: _Deck) -> Emitted:
 def _max_distance(row: RuleRow, d: _Deck) -> Emitted:
     shapes, taps = (d.expr(e) for e in _arity(row, 2))
     return ([f"maximum distance: every part of {shapes} farther than the value from {taps}",
-             "(the taps sized by the value; sizing approximates the euclidian distance with",
-             "cut corners, which is conservative)"],
-            f"({shapes} - {taps}.sized({_um(_value(row))}))")
+             "(the taps sized by the value with octagon_limit: the corners of a tap grow into",
+             "an octagon whose vertices lie up to 8.2 % beyond the value on the diagonals,",
+             "so the check is exact along the axes and lenient by up to 8.2 % diagonally;",
+             "any tap of the layer counts, also one in another well)"],
+            f"({shapes} - {taps}.sized({_um(_value(row))}, octagon_limit))")
 
 
 # --- topology: one hand-written snippet per fixture name
@@ -314,7 +357,10 @@ def _v4_array(row: RuleRow, d: _Deck) -> Emitted:
                         f"{v4} clusters: cuts sized by half of rules.v4.s and merged, so the "
                         "cuts of an array at up to the minimum space form one cluster")
     return (["v4 arrays: cuts of clusters with fewer than 4 cuts, or with a bbox narrower",
-             "than two cuts (2 x rules.v4.size + rules.v4.s) in either direction.",
+             "than 2 x rules.v4.size + rules.v4.s (1.2 um) in either direction: sized by",
+             "rules.v4.s / 2, a one-cut-wide cluster spans rules.v4.size + rules.v4.s (0.84)",
+             "and a two-cut-wide one at least 2 x (rules.v4.size + rules.v4.s) (1.68), so the",
+             "threshold separates them only because of that sizing.",
              "Approximation: cuts farther apart than rules.v4.s are separate clusters, and",
              "an L of 4 or more cuts passes"],
             (f"{cuts}.interacting({clusters}.interacting({cuts}, 1, 3) | "
@@ -394,7 +440,7 @@ def _summary(row: RuleRow) -> str:
 
 
 def _header(variant: str, what: list[str]) -> list[str]:
-    return [SPDX, f"# {variant} KLayout DRC deck, variant {variant}: {what[0]}",
+    return [SPDX, f"# KLayout DRC deck of variant {variant}: {what[0]}",
             *(f"# {line}" for line in what[1:]),
             f"# Written by {GENERATOR} (ws180g-klayout-deck) from the rule table:",
             "# generated: do not edit."]

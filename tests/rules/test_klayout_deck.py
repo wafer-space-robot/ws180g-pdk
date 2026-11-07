@@ -6,8 +6,6 @@ container through `build/sandbox-run` and skip when the runner is absent."""
 
 import dataclasses
 import re
-import shutil
-import subprocess
 import xml.etree.ElementTree as ET
 from collections import Counter
 from pathlib import Path
@@ -182,17 +180,63 @@ def test_cli(tmp):
 # --- sandbox: the deck runs in KLayout
 
 
-def _runner(repo_root: Path) -> Path:
-    runner = repo_root / "build" / "sandbox-run"
-    if not runner.exists():
-        pytest.skip("build/sandbox-run is absent")
-    if shutil.which("docker") is None:
-        pytest.skip("docker is absent")
-    return runner
+
+def _output_line(checks: str, rid: str) -> str:
+    return next(line for line in checks.splitlines() if f'.output("{rid}"' in line)
+
+
+def test_header_names_the_variant_once(deck):
+    for name, text in deck.items():
+        assert text.splitlines()[1].count(VARIANT) == 1, name
+
+
+def test_field_poly_space_excludes_the_gate_ends(deck):
+    checks = deck[f"{VARIANT}_checks.rb"]
+    assert "\nfield_po = po - df\n" in checks
+    assert "\nfield_po_edges_not_gate = field_po.edges - gate.edges\n" in checks
+    assert _output_line(checks, "po.s.df").startswith(
+        "field_po_edges_not_gate.separation(df.edges, 0.36.um, euclidian)")
+
+
+def test_unsupported_edges_raise(table, process, tmp):
+    rows = [dataclasses.replace(r, edges="ends") if r.id == "po.s.df" else r
+            for r in table.rows]
+    with pytest.raises(ValueError, match="ends"):
+        write_klayout_deck(RuleTable(table.variant, table.layers, rows), process, tmp / "d")
+
+
+def test_extension_catches_flush_and_inside_ends(deck, table):
+    checks = deck[f"{VARIANT}_checks.rb"]
+    assert "\npo_ends_in_df = po.edges.inside(df)\n" in checks
+    assert "\npo_flush_on_df = po.edges.inside(df.edges).interacting(po_and_gate)\n" in checks
+    assert "\ndf_ends_in_po = df.edges.inside(po)\n" in checks
+    for row in table.rows:
+        if row.kind == "min-extension":
+            line = _output_line(checks, row.id)
+            assert ".enclosed(" in line and ".merged.output(" in line, row.id
+
+
+def test_enclosure_catches_straddling_inner_shapes(deck, table):
+    checks = deck[f"{VARIANT}_checks.rb"]
+    assert "\nco_across_m1 = co.overlapping(m1).not_inside(m1)\n" in checks
+    for row in table.rows:
+        if row.kind == "min-enclosure":
+            assert "_across_" in _output_line(checks, row.id), row.id
+
+
+def test_max_distance_uses_octagonal_sizing(deck):
+    checks = deck[f"{VARIANT}_checks.rb"]
+    assert _output_line(checks, "nw.tap.dmax").startswith(
+        "(pd_and_nw - ntap.sized(10.0.um, octagon_limit))")
+
+
+# --- sandbox: the deck runs in KLayout
 
 
 def _gds(path: Path, process, boxes: list[tuple[str, int, int, int, int]]) -> None:
     """Write a layout (boxes in dbu on named layers) and derive its generated layers."""
+    from ws180g_layergen.derive import derive_file
+
     layout = kdb.Layout()
     layout.dbu = 0.001
     top = layout.create_cell("TOP")
@@ -200,8 +244,6 @@ def _gds(path: Path, process, boxes: list[tuple[str, int, int, int, int]]) -> No
         top.shapes(layout.layer(*process.layers[name].gds)).insert(kdb.Box(x1, y1, x2, y2))
     drawn = path.with_suffix(".drawn.gds")
     layout.write(str(drawn))
-    from ws180g_layergen.derive import derive_file
-
     derive_file(drawn, path, process)
 
 
@@ -213,30 +255,24 @@ def _report(path: Path) -> tuple[set[str], Counter]:
     return categories, items
 
 
-def _run(runner: Path, workdir: Path, *args: str) -> None:
-    done = subprocess.run(
-        [str(runner), "--mem", "2g", "--cpus", "1", "--workdir", str(workdir), "--",
-         "klayout", "-b", "-r", *args],
-        capture_output=True, text=True, check=False,
-    )
+def _klayout(sandbox, workdir: Path, *args: str) -> None:
+    done = sandbox.run(["klayout", "-b", "-r", *args], workdir, mem="2g", cpus=2)
     assert done.returncode == 0, done.stdout + done.stderr
 
 
 @pytest.mark.sandbox
-def test_deck_runs_on_an_empty_layout(table, process, repo_root, tmp):
-    runner = _runner(repo_root)
+def test_deck_runs_on_an_empty_layout(table, process, sandbox, tmp):
     work = tmp / "work"
     write_klayout_deck(table, process, work)
     _gds(work / "empty.gds", process, [])
-    _run(runner, work, f"{VARIANT}.drc", "-rd", "input=empty.gds", "-rd", "report=r.lyrdb")
+    _klayout(sandbox, work, f"{VARIANT}.drc", "-rd", "input=empty.gds", "-rd", "report=r.lyrdb")
     categories, items = _report(work / "r.lyrdb")
     assert {r.id for r in table.checkable()} <= categories
     assert not items
 
 
 @pytest.mark.sandbox
-def test_batch_deck_writes_one_report_per_input(table, process, repo_root, tmp):
-    runner = _runner(repo_root)
+def test_batch_deck_writes_one_report_per_input(table, process, sandbox, tmp):
     work = tmp / "work"
     write_klayout_deck(table, process, work)
     _gds(work / "empty.gds", process, [])
@@ -244,10 +280,58 @@ def test_batch_deck_writes_one_report_per_input(table, process, repo_root, tmp):
     _gds(work / "narrow_nw.gds", process, [("nw", 0, 0, 1000, 5000)])
     (work / "list.txt").write_text("empty.gds\nnarrow_nw.gds\n", encoding="utf-8")
     (work / "out").mkdir()
-    _run(runner, work, f"{VARIANT}_batch.drc", "-rd", "list=list.txt", "-rd", "out=out")
+    _klayout(sandbox, work, f"{VARIANT}_batch.drc", "-rd", "list=list.txt", "-rd", "out=out")
     checkable = {r.id for r in table.checkable()}
     categories, items = _report(work / "out" / "empty.lyrdb")
     assert checkable <= categories and not items
     categories, items = _report(work / "out" / "narrow_nw.lyrdb")
     assert checkable <= categories
     assert set(items) == {"nw.w"}
+
+
+# Review probes: (boxes in dbu, rules that must fire, rules that must not). The n-diffusion
+# cases have no p-tap, so ps.tap.dmax also fires; it is not asserted.
+PROBES = {
+    "legal_nfet": ([("nd", 0, 0, 2000, 1000), ("po", 640, -400, 1360, 1400)],
+                   set(), {"po.s.df", "po.x.df", "df.x.po", "po.l.n"}),
+    "field_po_near_df": ([("nd", 0, 0, 1000, 1000), ("po", 1300, 0, 1540, 1000)],
+                         {"po.s.df"}, set()),
+    "po_flush": ([("nd", 0, 0, 2000, 1000), ("po", 640, -400, 1360, 1000)],
+                 {"po.x.df"}, {"df.x.po", "po.s.df"}),
+    "po_inside": ([("nd", 0, 0, 2000, 1000), ("po", 640, -400, 1360, 700)],
+                  {"po.x.df"}, {"df.x.po", "po.s.df"}),
+    "df_flush": ([("nd", 0, 0, 1360, 1000), ("po", 640, -400, 1360, 1400)],
+                 {"df.x.po"}, {"po.x.df", "po.s.df"}),
+    "df_inside": ([("nd", 0, 0, 1200, 1000), ("po", 640, -400, 1360, 1400)],
+                  {"df.x.po"}, {"po.x.df"}),
+    "po_sab_flush": ([("sab", 0, 0, 1000, 2000), ("po", 300, -1000, 540, 2000)],
+                     {"po.x.sab"}, {"sab.e.po"}),
+    "po_sab_inside": ([("sab", 0, 0, 1000, 2000), ("po", 300, -1000, 540, 1500)],
+                      {"po.x.sab"}, set()),
+    "po_sab_legal": ([("sab", 0, 0, 1000, 2000), ("po", 300, -1000, 540, 3000)],
+                     set(), {"po.x.sab", "sab.e.po", "sab.s.po"}),
+    "df_sab_flush": ([("sab", 0, 0, 2000, 2000), ("nd", 300, -1000, 1300, 2000)],
+                     {"df.x.sab"}, {"sab.e.df"}),
+    "hanging_co": ([("m1", 0, 0, 1000, 1000), ("co", 900, 300, 1120, 520)],
+                   {"m1.e.co"}, set()),
+    "legal_outside": ([("nw", 5000, 0, 8000, 3000), ("nd", 0, 0, 1000, 1000),
+                       ("co", 300, 300, 520, 520), ("m1", 180, 180, 640, 640),
+                       ("po", 3000, -1000, 3240, 2000)],
+                      set(), {"nw.e.nd", "po.e.co", "m1.e.co", "df.e.co", "co.in"}),
+}
+
+
+@pytest.mark.sandbox
+def test_review_probes(table, process, sandbox, tmp):
+    work = tmp / "work"
+    write_klayout_deck(table, process, work)
+    for name, (boxes, _, _) in PROBES.items():
+        _gds(work / f"{name}.gds", process, boxes)
+    (work / "list.txt").write_text("".join(f"{n}.gds\n" for n in PROBES), encoding="utf-8")
+    (work / "out").mkdir()
+    _klayout(sandbox, work, f"{VARIANT}_batch.drc", "-rd", "list=list.txt", "-rd", "out=out")
+    for name, (_, fire, quiet) in PROBES.items():
+        _, items = _report(work / "out" / f"{name}.lyrdb")
+        assert fire <= set(items), (name, items)
+        assert not quiet & set(items), (name, items)
+        assert all(items[r] == 1 for r in fire), (name, items)

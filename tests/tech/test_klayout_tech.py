@@ -3,7 +3,6 @@
 
 import re
 import shutil
-import subprocess
 import xml.etree.ElementTree as ET
 
 import pytest
@@ -110,18 +109,15 @@ def test_cli(tmp):
 
 
 @pytest.mark.sandbox
-def test_klayout_loads_technology(process, written, repo_root):
-    runner = repo_root / "build" / "sandbox-run"
-    if not runner.exists():
-        pytest.skip("build/sandbox-run is absent")
-    script = repo_root / "tests" / "tech" / "check_tech.py"
-    if shutil.which("docker") is None:
-        pytest.skip("docker is absent")
-    done = subprocess.run(
-        [str(runner), "klayout", "-b", "-r", str(script), "-rd", f"lyt={written[1]}"],
-        capture_output=True,
-        text=True,
-        check=False,
+def test_klayout_loads_technology(process, written, tmp, sandbox):
+    workdir = tmp / "sandbox"
+    workdir.mkdir()
+    for f in (written[0], written[1]):
+        shutil.copy(f, workdir / f.name)
+    done = sandbox.run(
+        ["klayout", "-b", "-r", "/work/src/tests/tech/check_tech.py",
+         "-rd", f"lyt=/work/out/{VARIANT}.lyt"],
+        workdir=workdir,
     )
     assert done.returncode == 0, done.stdout + done.stderr
     match = re.search(r"^layers=(\d+)$", done.stdout, re.MULTILINE)

@@ -1,0 +1,12 @@
+{
+  "base_image": "ghcr.io/mithro/gf180-tcad-base@sha256:aedc07956fa71f33094decf80828a13e75ace36cb2426f720b0817aa9aca99b6",
+  "klayout": "0.30.12",
+  "klayout_python": "0.30.13",
+  "magic": "8.3.685",
+  "netgen": "1.5.324",
+  "ngspice": "47",
+  "open_pdks": "1689ac3f2dc763876eaf967227c7dfe831b031ae",
+  "pdk": "gf180mcuD",
+  "pydantic": "2.14.3",
+  "python": "3.12.3"
+}

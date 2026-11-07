@@ -53,10 +53,11 @@ full report with the uncovered entries by kind.
 
 The full build, `uv run ws180g-build` (default `--out out/`), runs all of it: the evidence report, the
 rule table, decks, tech files, fixtures and manual, the image check (including a `docker/build`
-rebuild of about one minute that proves the image ID reproduces, in every container build), gate
+rebuild that proves the image ID reproduces, in every container build; its export step took
+71.4 s on the build host), gate
 check 1 for both engines, gate check 2 with the regressions, the release tree `out/ws180g005/` and
-`out/build-manifest.json`. It takes about 45 to 50 minutes cold and about two minutes warm (cache in
-`tmp/build/`). `uv run ws180g-build --no-container` skips the image check and the engine runs. The
+`out/build-manifest.json`. The Phase 0 gate report measured 51:42 cold, on a build host shared
+with other container jobs, and 2:10 warm (cache in `tmp/build/`). `uv run ws180g-build --no-container` skips the image check and the engine runs. The
 documentation: `uv run sphinx-build -W docs out/docs` (after a build, which writes
 `docs/generated/`).
 

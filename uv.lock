@@ -998,12 +998,14 @@ source = { editable = "layergen" }
 dependencies = [
     { name = "klayout" },
     { name = "pydantic" },
+    { name = "ws180g-process" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "klayout", specifier = ">=0.30.12" },
     { name = "pydantic", specifier = ">=2.11" },
+    { name = "ws180g-process", editable = "process" },
 ]
 
 [[package]]

@@ -5,7 +5,7 @@ version = "0.0.0"
 description = "ws180g pipeline component: layergen"
 requires-python = ">=3.12"
 license = "Apache-2.0"
-dependencies = ["pydantic>=2.11", "klayout>=0.30.12"]
+dependencies = ["pydantic>=2.11", "klayout>=0.30.12", "ws180g-process"]
 
 [build-system]
 requires = ["hatchling"]

@@ -21,8 +21,10 @@ Each GF violation on a pass fixture ends in exactly one of:
   here and in `ws180g_precheck.gate.EXCLUDED` (expected only for the `dnw` module fixtures,
   whose ring topology is the module's open item).
 
-Every (a) and (b) adds the failing case to `tests/precheck/regressions/` as a permanent
-fixture: a Python module that regenerates the layout (spec 9.3). A GF violation from a rule
+Every (a) and (b) adds the failing case to `ws180g_precheck.regressions`
+(`precheck/src/ws180g_precheck/regressions/`, in `tests/precheck/regressions/` until the
+Phase 0 final fix wave) as a permanent fixture: a Python module that regenerates the layout
+(spec 9.3). The gate test and the build both run them. A GF violation from a rule
 the generic set cannot model in Phase 0 is listed as **unresolved, controller decision**,
 with the GF rule text and the fixture.
 

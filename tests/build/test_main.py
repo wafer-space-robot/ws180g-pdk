@@ -242,3 +242,29 @@ def test_container_run_with_a_wrong_fixture_fails(monkeypatch, staged, process, 
         _run(engines, staged, process, tmp)
     report = json.loads((tmp / "reports" / "klayout-fixtures.json").read_text(encoding="utf-8"))
     assert report["wrong"]["nw.w/pass_min"] == {"expected": {}, "got": {"x.y": 1}}
+
+
+def test_gate_2_runs_the_regression_fixtures(monkeypatch, staged, process, tmp):
+    """The build's GF180MCU runs include every permanent regression fixture of
+    `ws180g_precheck.regressions`, as the gate test does."""
+    from ws180g_precheck.gate import gate_fixtures, regression_names
+
+    names = regression_names()
+    assert names  # the Task 18 regressions
+    engines = FakeEngines(monkeypatch)
+    _run(engines, staged, process, tmp)
+    report = json.loads((tmp / "reports" / "gf180mcu-gate.json").read_text(encoding="utf-8"))
+    assert report["regressions"] == [f"regressions/{n}" for n in names]
+    expected = len(gate_fixtures(staged[2])) + len(names)
+    assert all(r["fixtures"] == expected for r in report["runs"].values())
+    retargeted = tmp / "work" / "gf180mcu" / "retargeted" / "regressions"
+    assert sorted(p.stem for p in retargeted.glob("*.gds")) == names
+
+
+def test_a_dirty_regression_fixture_fails_the_build(monkeypatch, staged, process, tmp):
+    from ws180g_precheck.gate import regression_names
+
+    case = f"regressions/{regression_names()[0]}"
+    engines = FakeEngines(monkeypatch, wrong={case})
+    with pytest.raises(BuildError, match=case):
+        _run(engines, staged, process, tmp)

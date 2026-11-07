@@ -1,0 +1,201 @@
+# SPDX-License-Identifier: Apache-2.0
+# The GDS layer map. The ws180g005 numbers are fixed: never renumber a layer.
+# Purpose text from spec section 5.1. A layer names the variant it first appears in,
+# or the optional module that adds it.
+
+[datatypes]
+drawing = 0
+label = 10
+pin = 2
+
+[layers.nw]
+gds = [1, 0]
+kind = "drawn"
+variant = "ws180g005"
+purpose = "n-well: the one drawn well; p-well is implicit"
+
+[layers.nd]
+gds = [2, 0]
+kind = "drawn"
+variant = "ws180g005"
+purpose = "n-diffusion: n+ active (source/drain, n-well tap)"
+
+[layers.pd]
+gds = [3, 0]
+kind = "drawn"
+variant = "ws180g005"
+purpose = "p-diffusion: p+ active (source/drain, substrate tap)"
+
+[layers.po]
+gds = [4, 0]
+kind = "drawn"
+variant = "ws180g005"
+purpose = "poly: gates and poly interconnect, resistors"
+
+[layers.co]
+gds = [5, 0]
+kind = "drawn"
+variant = "ws180g005"
+purpose = "contact: poly or diffusion to m1, nominal size"
+
+[layers.m1]
+gds = [11, 0]
+kind = "drawn"
+variant = "ws180g005"
+purpose = "metal: interconnect"
+
+[layers.v1]
+gds = [12, 0]
+kind = "drawn"
+variant = "ws180g005"
+purpose = "via: m1..m4 to the next metal, nominal size; v4 lands on mtop"
+
+[layers.m2]
+gds = [13, 0]
+kind = "drawn"
+variant = "ws180g005"
+purpose = "metal: interconnect"
+
+[layers.v2]
+gds = [14, 0]
+kind = "drawn"
+variant = "ws180g005"
+purpose = "via: m1..m4 to the next metal, nominal size; v4 lands on mtop"
+
+[layers.m3]
+gds = [15, 0]
+kind = "drawn"
+variant = "ws180g005"
+purpose = "metal: interconnect"
+
+[layers.v3]
+gds = [16, 0]
+kind = "drawn"
+variant = "ws180g005"
+purpose = "via: m1..m4 to the next metal, nominal size; v4 lands on mtop"
+
+[layers.m4]
+gds = [17, 0]
+kind = "drawn"
+variant = "ws180g005"
+purpose = "metal: interconnect"
+
+[layers.v4]
+gds = [18, 0]
+kind = "drawn"
+variant = "ws180g005"
+purpose = "via: m1..m4 to the next metal, nominal size; v4 lands on mtop"
+
+[layers.mtop]
+gds = [19, 0]
+kind = "drawn"
+variant = "ws180g005"
+purpose = "metal: interconnect"
+
+[layers.pad]
+gds = [20, 0]
+kind = "drawn"
+variant = "ws180g005"
+purpose = "pad opening: passivation opening"
+
+[layers.sab]
+gds = [21, 0]
+kind = "drawn"
+variant = "ws180g005"
+purpose = "silicide block: unsilicided poly and diffusion"
+
+[layers.ox_3v3]
+gds = [30, 0]
+kind = "drawn"
+variant = "ws180g035"
+purpose = "3.3 V oxide marker (spec section 5.4)"
+
+[layers.ox_1v8]
+gds = [31, 0]
+kind = "drawn"
+variant = "ws180g105"
+purpose = "1.8 V oxide marker (spec section 5.4)"
+
+[layers.dnw]
+gds = [32, 0]
+kind = "drawn"
+module = "deep-n-well"
+purpose = "deep n-well: isolated p-well region"
+
+[layers.rhi]
+gds = [33, 0]
+kind = "drawn"
+module = "high-res-poly"
+purpose = "high-resistance poly: high-sheet-resistance poly implant"
+
+[layers.mk_res]
+gds = [40, 0]
+kind = "drawn"
+variant = "ws180g005"
+purpose = "device marker: LVS device recognition (resistor)"
+
+[layers.mk_cap]
+gds = [41, 0]
+kind = "drawn"
+variant = "ws180g005"
+purpose = "device marker: LVS device recognition (capacitor)"
+
+[layers.mk_dio]
+gds = [42, 0]
+kind = "drawn"
+variant = "ws180g005"
+purpose = "device marker: LVS device recognition (diode)"
+
+[layers.mk_bjt]
+gds = [43, 0]
+kind = "drawn"
+variant = "ws180g005"
+purpose = "device marker: LVS device recognition (bipolar)"
+
+[layers.mk_esd]
+gds = [44, 0]
+kind = "drawn"
+variant = "ws180g005"
+purpose = "device marker: LVS device recognition (ESD)"
+
+[layers.mk_nofill]
+gds = [50, 0]
+kind = "drawn"
+variant = "ws180g005"
+purpose = "intent marker: fill exclusion"
+
+[layers.mk_boundary]
+gds = [51, 0]
+kind = "drawn"
+variant = "ws180g005"
+purpose = "intent marker: cell boundary"
+
+[layers.nsel]
+gds = [60, 0]
+kind = "generated"
+variant = "ws180g005"
+purpose = "n-select, generated from nd"
+
+[layers.psel]
+gds = [61, 0]
+kind = "generated"
+variant = "ws180g005"
+purpose = "p-select, generated from pd and unsilicided poly"
+
+[layers.gate]
+gds = [62, 0]
+kind = "generated"
+variant = "ws180g005"
+purpose = "poly over active"
+
+[layers.ntap]
+gds = [63, 0]
+kind = "generated"
+variant = "ws180g005"
+purpose = "n-well tap active"
+
+[layers.ptap]
+gds = [64, 0]
+kind = "generated"
+variant = "ws180g005"
+purpose = "substrate tap active"

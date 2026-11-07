@@ -49,7 +49,9 @@ def klayout_results(sandbox, deck_dir):
 
 
 @pytest.mark.sandbox
-@pytest.mark.parametrize("fixture", FIXTURES, ids=lambda f: f"{f.rule_id}/{f.name}")
+# ids are <rule>/<expect>_<name> (the file stem): <rule>/<name> repeats for the pass and
+# fail fixtures of the topology rules (co.in/co_on_field...).
+@pytest.mark.parametrize("fixture", FIXTURES, ids=lambda f: f"{f.rule_id}/{f.expect}_{f.name}")
 def test_klayout_fixture(fixture, klayout_results):
     result = klayout_results[fixture.path]
     assert result.categories_run > 0

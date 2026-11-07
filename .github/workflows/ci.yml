@@ -21,12 +21,11 @@ jobs:
     # failure is recorded in the Task 23 report and the sandbox tests stay host-run.
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # docker/build dates the image from the history of its inputs
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --all-packages
-      - name: Pull the base image
-        run: docker pull "$(grep -m1 '^FROM ' docker/Dockerfile | cut -d' ' -f2)"
-      - name: Build docker/
-        run: docker build -t ws180g-sandbox docker/
-      - run: uv run pytest -rs -v -m sandbox
+      - name: Build the image (docker/build pulls the pinned base itself)
+        run: docker/build
+      - run: uv run pytest -rs -v -m "sandbox and not slow"

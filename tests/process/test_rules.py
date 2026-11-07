@@ -52,12 +52,13 @@ def test_spot_values(process):
     assert r["pd.s.ngate"].composed_of[-1] == "rules.sel.x"
     assert (r["sab.e.po"].edges, r["sab.e.po"].edge_layer) == ("sides", "po")
     assert (r["sab.e.df"].edges, r["sab.e.df"].edge_layer) == ("sides", "df")
+    assert (r["po.s.df"].edges, r["po.s.df"].edge_layer) == ("exclude", "gate")
     assert r["m1.area"].margin_achieved == Decimal("1.524")
     assert r["dnw.w"].module == "deep-n-well"
 
 
 def test_aliases(process):
-    assert process.aliases == {"df": "nd|pd", "field_po": "po-(df.sized(rules.po.x.df))"}
+    assert process.aliases == {"df": "nd|pd", "field_po": "po-df"}
 
 
 def test_every_table_rule_is_present(process):
@@ -158,3 +159,16 @@ def test_edges_need_an_edge_layer():
     with pytest.raises(ValueError):
         RuleField(kind="min-enclosure", layers=["sab", "po&sab"], value=Decimal("0.265"),
                   unit="um", variant="ws180g005", provenance="derived", edges="sides")
+
+
+@pytest.mark.parametrize("edges", ["sides", "exclude"])
+def test_edges_values_accepted(edges):
+    rule = RuleField(kind="min-space", layers=["po", "df"], value=Decimal("0.36"), unit="um",
+                     variant="ws180g005", provenance="derived", edges=edges, edge_layer="gate")
+    assert rule.edges == edges
+
+
+def test_unknown_edges_value_rejected():
+    with pytest.raises(ValueError):
+        RuleField(kind="min-space", layers=["po", "df"], value=Decimal("0.36"), unit="um",
+                  variant="ws180g005", provenance="derived", edges="ends", edge_layer="gate")

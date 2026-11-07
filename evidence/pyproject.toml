@@ -8,6 +8,7 @@ license = "Apache-2.0"
 dependencies = ["pydantic>=2.11"]
 
 [project.scripts]
+ws180g-import-scmos = "ws180g_evidence.import_scmos:main"
 ws180g-import-gf180mcu = "ws180g_evidence.import_gf180mcu:main"
 
 [build-system]

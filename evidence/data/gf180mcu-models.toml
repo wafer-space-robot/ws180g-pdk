@@ -8,9 +8,22 @@ rule = "nfet_06v0"
 column = "lmin"
 kind = "gate-length"
 layers = []
+value = 0.6
+unit = "um"
+text = "6.0 V NMOS model nfet_06v0.1: lmin=6e-007 (m), the smallest gate length the nfet_06v0 card supports (bin .1 covers 0.6 to 0.7 um, bin .0 from 0.7 um up); line numbers refer to the copy installed by open_pdks 1689ac3 at /foss/pdks/gf180mcuD/libs.tech/ngspice/sm141064.ngspice"
+cite = "sm141064.ngspice line 37515 (.model nfet_06v0.1, typical section)"
+guideline = false
+
+[[entry]]
+id = "gf180mcu-models/nfet_06v0/lmin_bin0"
+source = "gf180mcu-models"
+rule = "nfet_06v0"
+column = "lmin_bin0"
+kind = "gate-length"
+layers = []
 value = 0.7
 unit = "um"
-text = "6.0 V NMOS model nfet_06v0.0: lmin=7e-007 (m), the shortest gate length of the model's bin"
+text = "6.0 V NMOS model nfet_06v0.0: lmin=7e-007 (m), the lower length bound of bin .0; shorter gates (0.6 to 0.7 um) use bin .1 (.model nfet_06v0.1, lmin=6e-007, line 37515); line numbers refer to the copy installed by open_pdks 1689ac3 at /foss/pdks/gf180mcuD/libs.tech/ngspice/sm141064.ngspice"
 cite = "sm141064.ngspice line 37177 (.model nfet_06v0.0, typical section)"
 guideline = false
 
@@ -23,7 +36,7 @@ kind = "thickness"
 layers = []
 value = 15.2
 unit = "nm"
-text = "6.0 V NMOS model nfet_06v0.0: toxe='1.52e-008+nfet_06v0_tox' (m), electrical gate-oxide thickness; the typical section sets .param nfet_06v0_tox=0 (line 114)"
+text = "6.0 V NMOS model nfet_06v0.0: toxe='1.52e-008+nfet_06v0_tox' (m), electrical gate-oxide thickness; the typical section sets .param nfet_06v0_tox=0 (line 114); line numbers refer to the copy installed by open_pdks 1689ac3 at /foss/pdks/gf180mcuD/libs.tech/ngspice/sm141064.ngspice"
 cite = "sm141064.ngspice line 37309 (.model nfet_06v0.0, typical section)"
 guideline = false
 
@@ -36,7 +49,7 @@ kind = "thickness"
 layers = []
 value = 16.0
 unit = "nm"
-text = "6.0 V NMOS model nfet_06v0.0: toxp='1.6e-008+nfet_06v0_tox' (m), physical gate-oxide thickness; the typical section sets .param nfet_06v0_tox=0 (line 114)"
+text = "6.0 V NMOS model nfet_06v0.0: toxp='1.6e-008+nfet_06v0_tox' (m), physical gate-oxide thickness; the typical section sets .param nfet_06v0_tox=0 (line 114); line numbers refer to the copy installed by open_pdks 1689ac3 at /foss/pdks/gf180mcuD/libs.tech/ngspice/sm141064.ngspice"
 cite = "sm141064.ngspice line 37311 (.model nfet_06v0.0, typical section)"
 guideline = false
 
@@ -49,7 +62,7 @@ kind = "other"
 layers = []
 value = 0.67314
 unit = "V"
-text = "6.0 V NMOS model nfet_06v0.0: vth0='0.67314+nfet_06v0_vth0', long-channel threshold voltage at zero body bias; the typical section sets .param nfet_06v0_vth0=0 (line 111)"
+text = "6.0 V NMOS model nfet_06v0.0: vth0='0.67314+nfet_06v0_vth0', long-channel threshold voltage at zero body bias; the typical section sets .param nfet_06v0_vth0=0 (line 111); line numbers refer to the copy installed by open_pdks 1689ac3 at /foss/pdks/gf180mcuD/libs.tech/ngspice/sm141064.ngspice"
 cite = "sm141064.ngspice line 37337 (.model nfet_06v0.0, typical section)"
 guideline = false
 
@@ -62,7 +75,7 @@ kind = "gate-length"
 layers = []
 value = 0.5
 unit = "um"
-text = "6.0 V PMOS model pfet_06v0.0: lmin=0.5e-6 (m), the shortest gate length of the model's bin"
+text = "6.0 V PMOS model pfet_06v0.0: lmin=0.5e-6 (m), the shortest gate length of the model's bin; line numbers refer to the copy installed by open_pdks 1689ac3 at /foss/pdks/gf180mcuD/libs.tech/ngspice/sm141064.ngspice"
 cite = "sm141064.ngspice line 38177 (.model pfet_06v0.0, typical section)"
 guideline = false
 
@@ -75,6 +88,6 @@ kind = "other"
 layers = []
 value = -0.8978
 unit = "V"
-text = "6.0 V PMOS model pfet_06v0.0: vth0='-0.8978+pfet_06v0_dvth0', long-channel threshold voltage at zero body bias; the typical section sets .param pfet_06v0_dvth0=0 (line 124)"
+text = "6.0 V PMOS model pfet_06v0.0: vth0='-0.8978+pfet_06v0_dvth0', long-channel threshold voltage at zero body bias; the typical section sets .param pfet_06v0_dvth0=0 (line 124); line numbers refer to the copy installed by open_pdks 1689ac3 at /foss/pdks/gf180mcuD/libs.tech/ngspice/sm141064.ngspice"
 cite = "sm141064.ngspice line 38274 (.model pfet_06v0.0, typical section)"
 guideline = false

@@ -59,12 +59,6 @@ inside() {
     esac
 }
 
-ancestor "the repo root" "$REPO"
-case "$WORKDIR/" in
-    "$REPO"/tmp/*) ;;
-    "$REPO"/*) die "workdir inside the repo must be under its tmp/: $WORKDIR" ;;
-esac
-
 # $HOME: from the environment, else the passwd entry; unknown means refuse to run.
 home_dir() {
     local h="${HOME:-}" entry
@@ -78,6 +72,12 @@ home_dir() {
 HOME_DIR="$(home_dir)" || die "cannot determine the home directory (\$HOME or passwd entry)"
 case "$HOME_DIR/" in
     "$WORKDIR"/*) die "workdir must not be \$HOME ($HOME_DIR) or an ancestor of it: $WORKDIR" ;;
+esac
+
+ancestor "the repo root" "$REPO"
+case "$WORKDIR/" in
+    "$REPO"/tmp/*) ;;
+    "$REPO"/*) die "workdir inside the repo must be under its tmp/: $WORKDIR" ;;
 esac
 
 # git: a checkout (.git dir or worktree .git file) must resolve, or nothing runs. The GIT_*

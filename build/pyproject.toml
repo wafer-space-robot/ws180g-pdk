@@ -9,6 +9,7 @@ dependencies = ["pydantic>=2.11", "ws180g-process"]
 
 [project.scripts]
 ws180g-check-names = "ws180g_build.naming:main"
+ws180g-check-private = "ws180g_build.private_check:main"
 
 [build-system]
 requires = ["hatchling"]

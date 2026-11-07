@@ -28,6 +28,11 @@ image) runs every per-rule fixture through the KLayout deck in one container run
 against its expected markers. Results are cached in `tmp/klayout-fixtures/run/cache/` by the bytes of
 the deck and the layout; delete `tmp/klayout-fixtures/` to force a fresh engine run (about 4 minutes).
 
+Gate check 1, Magic half: `uv run pytest tests/rules/test_magic_fixtures.py -rs -v` runs the same fixtures
+through the Magic technology in one Magic session (cache in `tmp/magic-fixtures/run/cache/`; a few seconds).
+Both engines: `uv run pytest tests/rules/test_engines_agree.py -rs -v` checks that KLayout and Magic report the
+same rule ids on every fixture of a two-engine rule, and prints each recorded `MAGIC_EXCEPTIONS` case.
+
 ## Pre-commit checks
 
 Two checkers guard every commit:

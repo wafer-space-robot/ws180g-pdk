@@ -91,3 +91,14 @@ def test_caps_cannot_be_removed(layout, tmp, opts):
 def test_caps_in_range_accepted(layout, tmp, opts):
     res = check(layout["runner"], tmp / "wt/tmp/x", *opts)
     assert res.returncode == 0, res.stderr
+
+
+@pytest.mark.sandbox
+def test_image_id_mismatch_refused(sandbox, layout, tmp):
+    """The local image must have the ID in docker/IMAGE_ID (here a wrong one)."""
+    (layout["wt"] / "docker" / "IMAGE_ID").write_text("sha256:" + "0" * 64 + "\n")
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    res = subprocess.run([str(layout["runner"]), "--workdir", str(tmp / "wt/tmp/x"), "--", "true"],
+                         capture_output=True, text=True, check=False, env=env)
+    assert res.returncode == 2
+    assert "docker/IMAGE_ID" in res.stderr

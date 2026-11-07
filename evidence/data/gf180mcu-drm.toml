@@ -351,7 +351,7 @@ value = 0.12
 unit = "um"
 text = "Metal1 overlap of contact I) Metal1 (< 0.34μm) end-of-line overlap (1) II) If Metal1 overlaps contact by < 0.04μm on one side, adjacent metal1 edges overlap III) Minimum Metal1 overlap of contact on all sides for minimum contact resistance variation* (guideline)"
 cite = "21_Contact_56.csv, row CO.6, column -"
-guideline = false
+guideline = true
 
 [[entry]]
 id = "gf180mcu-drm/CO.7"
@@ -9023,7 +9023,7 @@ value = 0.12
 unit = "um"
 text = "Metaln (where n=1 to 5) overlap of Vian i. Metaln (< 0.34μm) end-of-line overlap (1) ii. If Metaln overlap Vian by < 0.04μm on one side, adjacent Metaln edges overlap iii. Minimum Metaln overlap of Vian on all sides for minimum Vian resistance variation (guideline)*"
 cite = "23_Vian_59.csv, row Vn.3, column -"
-guideline = false
+guideline = true
 
 [[entry]]
 id = "gf180mcu-drm/Vn.4/a"
@@ -9075,7 +9075,7 @@ value = 0.12
 unit = "um"
 text = "Metal [n+1] overlap of Vian i. Metal [n+1] (< 0.34μm) end-of-line overlap1 ii. If Metal [n+1] overlap Vian by < 0.04μm on one side, adjacent Metal [n+1] edges overlap iii. Minimum Metal[n+1] overlap of Vian on all sides for minimum Vian resistance variation (guideline)*"
 cite = "23_Vian_59.csv, row Vn.4, column -"
-guideline = false
+guideline = true
 
 [[entry]]
 id = "gf180mcu-drm/Y.DF.6/5v"

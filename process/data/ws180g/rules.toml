@@ -329,9 +329,9 @@ value = 0.22
 unit = "um"
 variant = "ws180g005"
 provenance = "public-source"
-evidence = ["gf180mcu-drm/CO.1", "xc018/contact/width", "scmos8/5.1/deep", "scmos8/5.1/subm"]
+evidence = ["gf180mcu-drm/CO.1", "xc018/contact/width", "scmos8/5.1/deep", "scmos8/5.1/subm", "scmos8/6.1/deep", "scmos8/6.1/subm"]
 engines = ["klayout", "magic"]
-note = "exact (cut sizes are exempt from the margin, spec 3.3): GF CO.1 0.22; XC 0.22; S8 5.1 2 lambda 0.18/0.20; the largest public exact size"
+note = "exact (cut sizes are exempt from the margin, spec 3.3): GF CO.1 0.22; XC 0.22; S8 5.1 (poly contact) and 6.1 (active contact) 2 lambda 0.18/0.20; the largest public exact size"
 
 [rules."co.s"]
 kind = "min-space"

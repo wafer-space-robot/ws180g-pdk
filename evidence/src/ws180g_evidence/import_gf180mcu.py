@@ -57,6 +57,8 @@ NUMBER = re.compile(
 CONDITIONED = re.compile(r"^(?P<value>[^()]+?)\s*\((?P<condition>[^()]*)\)$")
 # A continuation row's part letter: `a\) If x >= 2.0um ...`.
 PART_LETTER = re.compile(r"^\(?(?P<letter>[a-z]\d?)\\?\)\s*")
+# A numbered item of a multi-part description: `i. ...`, `iii. ...`, `I) ...`, `III) ...`.
+ITEM_LABEL = re.compile(r"^(?:[ivx]+\.|[IVX]+\))\s")
 # A percentage in a coverage description: `>= 14%`, `>30%`.
 PERCENT = re.compile(r"(\d+(?:\.\d+)?)\s*%")
 # A unit named in the description: `Min. COMP area (um2)`, `current density ... (mA/um)`.
@@ -222,10 +224,17 @@ def _rule_table(file: str, rows: list[list[str]], dropped: list[str]) -> list[En
         described = DESCRIPTION_UNIT.search(description)
         if described and described.group(1) in ("mA/m", "mA/\uf06dm"):
             text += MA_PER_UM_NOTE
+        marked = _guideline_items(lines)
         for column, cell in cells:
             values = _values(cell, rule)
             if not values and _normalise(cell) not in NOT_A_VALUE:
                 dropped.append(f"{file}, row {rule}, column {column or '-'}: {_normalise(cell)}")
+            if len(values) > 1 and len(values) >= len(marked):
+                # Items align with the cell's values from the end (an item may hold
+                # several values, but the last item is the last value).
+                offset = len(values) - len(marked)
+                values = [(part, value, unit, star or (i >= offset and marked[i - offset]))
+                          for i, (part, value, unit, star) in enumerate(values)]
             for part, value, unit, star in values:
                 if part_letter:
                     part = part_letter if part is None else f"{part_letter}-{part}"
@@ -240,6 +249,20 @@ def _rule_table(file: str, rows: list[list[str]], dropped: list[str]) -> list[En
                     file, rule, column, part, kind, value, unit, text,
                     guideline=all_guideline or rule_guideline or star))
     return entries
+
+
+def _guideline_items(lines: list[str]) -> list[bool]:
+    """For a description of numbered items (`i.`, `ii.`, ... or `I)`, `II)`, ...), whether
+    each item says "(guideline)"; a line without a label continues the item before it.
+    Empty when the description has no numbered items or none is a guideline."""
+    items: list[str] = []
+    for line in lines:
+        if ITEM_LABEL.match(line):
+            items.append(line)
+        elif items:
+            items[-1] += " " + line
+    marked = ["(guideline)" in item.lower() for item in items]
+    return marked if any(marked) else []
 
 
 def _rule_id(raw: str) -> tuple[str, str | None, bool]:

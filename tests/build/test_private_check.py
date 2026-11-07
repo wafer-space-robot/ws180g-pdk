@@ -208,3 +208,129 @@ def test_install_hooks_is_idempotent(repo_root, tmp):
     link = root / ".git/hooks/pre-commit"
     assert link.is_symlink()
     assert link.resolve() == (root / "tools/git-hooks/pre-commit").resolve()
+
+
+def test_cached_sees_a_partially_staged_marker(mini):
+    _add(mini, "notes.txt", f"first line\nthis is {MARKER} stuff\n")
+    (mini / "notes.txt").write_text("first line\nclean now\n")
+    assert check_private(mini) == []
+    assert [(f.path, f.line) for f in check_private(mini, cached=True)] == [("notes.txt", 2)]
+
+
+def test_cached_scans_a_staged_but_deleted_file(mini):
+    _add(mini, "notes.txt", f"{MARKER}\n")
+    (mini / "notes.txt").unlink()
+    assert check_private(mini) == []
+    assert [(f.path, f.line) for f in check_private(mini, cached=True)] == [("notes.txt", 1)]
+
+
+def test_cached_reads_the_staged_evidence(mini):
+    assert check_private(mini, cached=True) == []
+    set_toml(mini / "evidence/data/sources.toml", ["sources", "onc18", "url"], "")
+    assert check_private(mini, cached=True) == []
+    _git(mini, "add", "evidence/data/sources.toml")
+    assert [f.path for f in check_private(mini, cached=True)] == ["evidence/data/sources.toml"]
+
+
+def test_cached_reads_the_staged_process(mini):
+    path = mini / "process/data/ws180g/process.toml"
+    path.write_text(path.read_text().replace('"gf180mcu-drm/GRID"', '"gf180mcu-drm/NOPE.1"'))
+    assert check_private(mini, cached=True) == []
+    _git(mini, "add", "process/data/ws180g/process.toml")
+    assert [(f.path, f.line) for f in check_private(mini, cached=True)] == [
+        ("process/data/ws180g/process.toml", 10)]
+
+
+def test_cached_hashes_the_staged_vendored_bytes(mini):
+    rel = "evidence/sources/gf180mcu-drm/16_Poly2_42.csv"
+    (mini / rel).write_text((mini / rel).read_text() + "x\n")
+    assert check_private(mini, cached=True) == []
+    _git(mini, "add", rel)
+    assert [f.path for f in check_private(mini, cached=True)] == [rel]
+    (mini / rel).unlink()
+    assert [f.path for f in check_private(mini, cached=True)] == [rel]
+
+
+def test_real_repository_index_has_no_findings(repo_root):
+    assert check_private(repo_root, cached=True) == []
+
+
+def test_main_cached(mini, capsys):
+    _add(mini, "notes.txt", f"{MARKER}\n")
+    (mini / "notes.txt").write_text("clean\n")
+    assert main([str(mini)]) == 0
+    assert main(["--cached", str(mini)]) == 1
+    assert "notes.txt:1:" in capsys.readouterr().out
+
+
+def test_allow_entry_needs_a_comment_above(mini):
+    allowed = f"we never copy {SHORT} material"
+    _add(mini, "docs/spec.md", f"{allowed}\n")
+    _add(mini, "build/private-allow.txt", f"# why\n\ndocs/*.md: {allowed}\n")
+    findings = check_private(mini)
+    assert [(f.path, f.line) for f in findings] == [("build/private-allow.txt", 3)]
+    assert "comment" in findings[0].reason
+
+
+@pytest.mark.parametrize("entry", ["docs/*.md: ", "docs/*.md:", ": some text"])
+def test_allow_entry_with_empty_text_or_glob(mini, entry):
+    _add(mini, "build/private-allow.txt", f"# why\n{entry}\n")
+    findings = check_private(mini)
+    assert [(f.path, f.line) for f in findings] == [("build/private-allow.txt", 2)]
+    assert "<path glob>: <exact line text>" in findings[0].reason
+
+
+@pytest.mark.parametrize("encoding", ["utf-16", "utf-16-be"])
+def test_utf16_text_with_a_bom_is_scanned(mini, encoding):
+    text = f"ok\n{MARKER}\n"
+    data = text.encode(encoding)
+    if encoding == "utf-16-be":
+        data = b"\xfe\xff" + data
+    _add(mini, "notes.txt", data)
+    assert [(f.path, f.line) for f in check_private(mini)] == [("notes.txt", 2)]
+    assert [(f.path, f.line) for f in check_private(mini, cached=True)] == [("notes.txt", 2)]
+
+
+def test_pre_commit_hook_checks_the_index(repo_root, mini):
+    hook = repo_root / "tools/git-hooks/pre-commit"
+    _add(mini, "notes.txt", f"{MARKER}\n")
+    (mini / "notes.txt").write_text("clean\n")
+    run = subprocess.run([str(hook)], cwd=mini, env=_hook_env(repo_root),
+                         capture_output=True, text=True, check=False)
+    assert run.returncode == 1, run.stdout + run.stderr
+    assert "notes.txt:1:" in run.stdout
+
+
+def _hooked_repo(repo_root: Path, tmp: Path) -> Path:
+    root = tmp / "hooked"
+    shutil.copytree(repo_root / "tools", root / "tools")
+    _git(root, "init", "-q")
+    return root
+
+
+def _install(root: Path, repo_root: Path) -> subprocess.CompletedProcess:
+    return subprocess.run([str(root / "tools/install-hooks")], cwd=root,
+                          env=_hook_env(repo_root), capture_output=True, text=True,
+                          check=False)
+
+
+def test_install_hooks_honours_core_hooks_path(repo_root, tmp):
+    root = _hooked_repo(repo_root, tmp)
+    _git(root, "config", "core.hooksPath", "myhooks")
+    run = _install(root, repo_root)
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert (root / "myhooks/pre-commit").is_symlink()
+    assert not (root / ".git/hooks/pre-commit").exists()
+
+
+def test_install_hooks_refuses_a_linked_worktree(repo_root, tmp):
+    root = _hooked_repo(repo_root, tmp)
+    _git(root, "add", "tools")
+    _git(root, "-c", "user.name=t", "-c", "user.email=t@example.invalid",
+         "commit", "-q", "-m", "tools")
+    linked = tmp / "linked"
+    _git(root, "worktree", "add", "-q", str(linked))
+    run = _install(linked, repo_root)
+    assert run.returncode != 0
+    assert "main checkout" in run.stderr
+    assert not (root / ".git/hooks/pre-commit").exists()

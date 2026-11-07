@@ -136,3 +136,16 @@ public = true
 
 [sources.xc018.sha256]
 "xc018_datasheet.pdf" = "f7cc3687bbf409fd50cf53f7502a20dfbed9aef43da634f3e01e08ed1a4db6cf"
+
+[sources.gf180mcu-models]
+title = "GF180MCU open PDK ngspice model card sm141064.ngspice (gf180mcu_fd_pr, as installed by open_pdks)"
+url = "https://github.com/fossi-foundation/globalfoundries-pdk-libs-gf180mcu_fd_pr/blob/main/models/ngspice/sm141064.ngspice"
+licence = "Apache-2.0"
+commit = "1689ac3f2dc763876eaf967227c7dfe831b031ae"
+retrieved = 2026-11-07
+transcribed = true
+vendored = false
+public = true
+
+[sources.gf180mcu-models.sha256]
+"sm141064.ngspice" = "69a7ab877344a6d477fdd11440457f64e7ad88a624504a737a161da463de8bc8"

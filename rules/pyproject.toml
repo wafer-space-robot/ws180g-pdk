@@ -11,6 +11,7 @@ dependencies = ["pydantic>=2.11", "klayout>=0.30.12", "ws180g-process", "ws180g-
 ws180g-rule-table = "ws180g_rules.table:main"
 ws180g-klayout-deck = "ws180g_rules.klayout_deck:main"
 ws180g-fixtures = "ws180g_rules.fixtures:main"
+ws180g-manual = "ws180g_rules.manual:main"
 
 [build-system]
 requires = ["hatchling"]

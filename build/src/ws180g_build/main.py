@@ -71,6 +71,11 @@ VERIFY_TAG = "ws180g-pdk-base:verify"
 Log = Callable[[str], None]
 
 
+def _log(message: str) -> None:
+    """Print a progress line at once (the build is often run with its output in a file)."""
+    print(message, flush=True)
+
+
 class BuildError(RuntimeError):
     """A step of the build failed; the message says which and why."""
 
@@ -108,7 +113,7 @@ def sandbox_runner(repo: Path = REPO, mem: str = SANDBOX_MEM,
     return run
 
 
-def check_image(image_id: str, work: Path, repo: Path = REPO, log: Log = print) -> None:
+def check_image(image_id: str, work: Path, repo: Path = REPO, log: Log = _log) -> None:
     """The local image `docker/IMAGE` names has the ID `image_id`, and rebuilding it with
     `docker/build` gives that ID again (the build log goes to `work/image-build.log`)."""
     image = (repo / "docker" / "IMAGE").read_text(encoding="utf-8").splitlines()[0].strip()
@@ -136,7 +141,7 @@ def _fixture_id(f: Fixture) -> str:
 
 def run_engines(table: RuleTable, process, fixtures: list[Fixture], generated: Path,
                 reports: Path, work: Path, runner: Runner, image_id: str,
-                log: Log = print) -> None:
+                log: Log = _log) -> None:
     """The three container runs of step 4; writes their reports and raises `BuildError`
     when any fixture does not give the expected markers."""
     from ws180g_precheck.gate import EXCLUDED, gate_fixtures
@@ -201,7 +206,7 @@ def run_engines(table: RuleTable, process, fixtures: list[Fixture], generated: P
 
 def build(variant: str, out: Path, docs: Path, container: bool = True,
           process_dir: Path = PROCESS_DATA, evidence_dir: Path = EVIDENCE_DATA,
-          runner: Runner | None = None, log: Log = print) -> dict:
+          runner: Runner | None = None, log: Log = _log) -> dict:
     """Run the build (see the module docstring) and return the manifest."""
     out, docs = Path(out), Path(docs)
     for name in (*OWNED, variant):

@@ -11,6 +11,9 @@ Start with the design document:
 Everything in this repository comes from public sources, each cited; nothing here is under a
 non-disclosure agreement. Licence: Apache-2.0 (see [`LICENSE`](LICENSE)).
 
+Status: Phase 0 (foundations) is complete apart from the library repositories; see the gate report,
+[`docs/phase-0-report.md`](docs/phase-0-report.md).
+
 ## Development
 
 ```
@@ -25,13 +28,38 @@ Run `pytest` from the repository root: the basetemp (`tmp/pytest`) is relative t
 
 Gate check 1, KLayout half: `uv run pytest tests/rules/test_klayout_fixtures.py -rs -v` (needs the container
 image) runs every per-rule fixture through the KLayout deck in one container run and checks each
-against its expected markers. Results are cached in `tmp/klayout-fixtures/run/cache/` by the bytes of
-the deck and the layout; delete `tmp/klayout-fixtures/` to force a fresh engine run (about 4 minutes).
+against its expected markers. Results are cached in `tmp/klayout-fixtures/run/cache/`, keyed by the deck files, the
+derived layout's bytes and the container image ID; delete `tmp/klayout-fixtures/` to force a fresh
+engine run (about 4 minutes).
 
 Gate check 1, Magic half: `uv run pytest tests/rules/test_magic_fixtures.py -rs -v` runs the same fixtures
-through the Magic technology in one Magic session (cache in `tmp/magic-fixtures/run/cache/`; a few seconds).
+through the Magic technology in one Magic session (cache in `tmp/magic-fixtures/run/cache/`, keyed by the tech files, the derived layout, the
+script's `BOX_GROW` and the image ID; a few seconds).
 Both engines: `uv run pytest tests/rules/test_engines_agree.py -rs -v` checks that KLayout and Magic report the
 same rule ids on every fixture of a two-engine rule, and prints each recorded `MAGIC_EXCEPTIONS` case.
+
+Gate check 2: `uv run pytest tests/precheck/test_fixture_retarget.py tests/precheck/test_gf180mcu_deck.py -rs -v`
+retargets every pass fixture (and the permanent regression fixtures) to GF180MCU and runs them through
+the public GF180MCU deck for each `metal_top` value (9K, 11K, 30K), one container per value;
+`test_gf180mcu_deck.py` is the positive control (the deck finds known violations in a GF-native
+layout). Results are cached in `tmp/gf180mcu-retarget/` (keyed by the retargeted bytes, the mapping,
+`metal_top`, the deck path and the image ID); a cold run takes about 15 minutes per `metal_top`.
+`tests/precheck/test_gf180mcu_io_mt30.py` is informative only (the public IO library through the 30K
+top-metal rules). The decision log is [`docs/phase-0-retarget-log.md`](docs/phase-0-retarget-log.md).
+
+Gate check 3: `uv run ws180g-evidence-report` prints the margin report summary (rows by status, uncovered
+binding entries) and any failing row, and exits 1 unless the report is ok; `--markdown PATH` writes the
+full report with the uncovered entries by kind.
+
+The full build, `uv run ws180g-build` (default `--out out/`), runs all of it: the evidence report, the
+rule table, decks, tech files, fixtures and manual, the image check (including a `docker/build`
+rebuild that proves the image ID reproduces, in every container build; its export step took
+71.4 s on the build host), gate
+check 1 for both engines, gate check 2 with the regressions, the release tree `out/ws180g005/` and
+`out/build-manifest.json`. The Phase 0 gate report measured 51:42 cold, on a build host shared
+with other container jobs, and 2:10 warm (cache in `tmp/build/`). `uv run ws180g-build --no-container` skips the image check and the engine runs. The
+documentation: `uv run sphinx-build -W docs out/docs` (after a build, which writes
+`docs/generated/`).
 
 ## Pre-commit checks
 

@@ -82,7 +82,7 @@ def test_deterministic_and_dateless(table, tmp):
 
 
 def test_manual_does_not_read_the_evidence_set():
-    import ws180g_rules.manual as manual
+    from ws180g_rules import manual
 
     source = Path(manual.__file__).read_text(encoding="utf-8")
     assert "ws180g_evidence" not in source

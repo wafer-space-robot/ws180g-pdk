@@ -1,10 +1,8 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Phase 0 gate report
 
-Date: 2026-11-07. Commit: the evidence runs used `d284382` (branch `task-23-gate-report`, on `main` `df0f77a`),
-with this report, its table test and the README changes not yet committed; those touch
-no code under test.
-Variant: `ws180g005`.
+Date: 2026-11-07. Branch `task-23-gate-report`, on `main` `df0f77a`; the commit or tree of
+each run is in [the tree of each run](#the-tree-of-each-run). Variant: `ws180g005`.
 
 This report records the evidence for the Phase 0 gate of the design document (section 10):
 
@@ -151,14 +149,19 @@ sheet, registered, not yet transcribed, 0 entries; plan decision 13).
 
 - Image: `ws180g-pdk-base:local`, config digest
   `sha256:2fe8eb944861d8fa2a63da8f7052905fa8c44c758045adc6e503520b08bc8fdd`, equal to
-  `docker/IMAGE_ID`. The full build checked it and rebuilt it with `docker/build`
-  (`tmp/build/ws180g005/image-build.log`: `exporting config sha256:2fe8eb94…bc8fdd`);
-  the manifest records `"image_check": "rebuilt, ID reproduced"`.
+  `docker/IMAGE_ID`. Each of the three builds below checked it and rebuilt it with
+  `docker/build`, and each manifest records `"image_check": "rebuilt, ID reproduced"`
+  (`tmp/t23/manifests-image-check.log`). Every build overwrites the rebuild's log
+  `tmp/build/ws180g005/image-build.log`; the copy kept from the last build,
+  `tmp/t23/image-build-build3.log`, shows `exporting config sha256:2fe8eb94…bc8fdd` and the
+  longest step, the export, `#7 DONE 71.4s`.
 - Full build, cold: `uv run ws180g-build --out tmp/t23/out` exit 0 in 51:42 wall time
-  (`tmp/t23/build1.log`; two other container jobs shared the host), `manifest:
+  (`tmp/t23/build1.log`) on the shared build host: one pytest container job ran beside it
+  at a time (gate check 1, then gate check 2), `manifest:
   tmp/t23/out/build-manifest.json (287 files)`. The manifest records
   `"git_commit": "d284382d9d7a1a19dbb5c7a1d55e411582bb9fee"`, `"git_dirty": true`
-  (this report was being written in the checkout), `"container_runs": true`,
+  (the HEAD when the manifest was written: the build started at `df0f77a`, see
+  [the trees of the runs](#the-tree-of-each-run)), `"container_runs": true`,
   89 rules and 261 fixtures.
 - Warm rerun: `uv run ws180g-build --out tmp/t23/out2` exit 0 in 2:10, every engine
   result from the cache (`tmp/t23/build2.log`); `diff -r tmp/t23/out tmp/t23/out2`
@@ -168,6 +171,25 @@ sheet, registered, not yet transcribed, 0 entries; plan decision 13).
   (`tmp/t23/build3.log`), manifest `"git_commit": "4e7169764be493f5c8708ca73889b34f35e0cd4d"`,
   `"git_dirty": false` (`tmp/t23/build3-manifest.log`); `diff -r tmp/t23/out2 tmp/t23/out3`
   differs only in those two manifest fields (`tmp/t23/diff-out2-out3.log`).
+
+(the-tree-of-each-run)=
+### The tree of each run
+
+The runs were made while this branch grew; the commits after `df0f77a` add a layergen test,
+the two `tools/` scripts with their tests, this report and README text, none of which the
+gate runs execute. "Uncommitted" means files in the worktree that a later commit added.
+
+| Run | Tree |
+|---|---|
+| Full build, cold (`build1.log`) | started at `df0f77a`; `7843b5a` and `d284382` were committed during it, so its manifest names `d284382`, dirty |
+| Gate check 1 (`gate1.log`) | `d284382` |
+| Gate check 3, `ws180g-check-private`, `ws180g-check-names` | `d284382` with an uncommitted README draft |
+| CI sandbox job | `d284382` (pushed) |
+| Gate check 2 (`gate2.log`) | `d284382`, then `8249e4e` from its last minutes, with uncommitted report drafts |
+| Warm build (`build2.log`) | `d284382` with uncommitted README and report drafts and the table test |
+| Host suite, ruff (`host-suite.log`, `ruff.log`) | `8249e4e` with the report, its table test and the toctree entry uncommitted (committed as `c1b6693`) |
+| Clean build (`build3.log`) | `4e71697`, clean |
+| Sphinx (`sphinx.log`) | the tree committed as `171bd3a` |
 
 ## CI
 
@@ -352,7 +374,7 @@ git checkout 4e71697      # the commit of the clean rerun; or main
 uv sync --all-packages
 docker/build                    # the image; prints sha256:2fe8eb94..., equal to docker/IMAGE_ID
 mkdir -p tmp/t23
-uv run ws180g-build --out tmp/t23/out > tmp/t23/build1.log 2>&1            # about 45 min cold
+uv run ws180g-build --out tmp/t23/out > tmp/t23/build1.log 2>&1            # cold: 51:42 here
 uv run ws180g-build --out tmp/t23/out2 > tmp/t23/build2.log 2>&1           # warm
 diff -r tmp/t23/out tmp/t23/out2
 uv run pytest tests/rules/test_klayout_fixtures.py tests/rules/test_magic_fixtures.py \

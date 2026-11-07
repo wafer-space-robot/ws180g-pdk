@@ -9,7 +9,8 @@
 2. derives the generated layers of every input with `ws180g_layergen.derive_file` into
    `out_dir/derived/<parent dir>__<stem>.gds` (`run_klayout.derived_name`);
 3. looks each one up in `out_dir/cache/<key>.json`, where the key is the SHA-256 of the two
-   technology files and the derived layout's bytes (`cache_key`);
+   technology files, the derived layout's bytes, `BOX_GROW` and the container image ID
+   (`cache_key`; `image_id` defaults to `docker/IMAGE_ID`);
 4. for the misses only, copies each derived layout to `out_dir/magic/c_<NNNN>.gds` with its
    cells renamed to `c_<NNNN>` (the top cell) and `c_<NNNN>_<k>`: every fixture's top cell is
    `test`, and one Magic session cannot hold two cells of one name (`out_dir/magic/names.txt`
@@ -44,13 +45,20 @@ import klayout.db as kdb
 from ws180g_layergen.derive import derive_file
 from ws180g_process.model import Process
 
-from ws180g_rules.run_klayout import DrcResult, DrcResults, Runner, _ordered, derived_name
+from ws180g_rules.run_klayout import (
+    DrcResult,
+    DrcResults,
+    Runner,
+    _ordered,
+    derived_name,
+    read_image_id,
+)
 
 #: Where the runner mounts `out_dir` in the container.
 CONTAINER_OUT = "/work/out"
 #: Part of every cache key; bump it when the meaning of a cached result changes (the script,
 #: the parser, the result fields), so old entries are not reused.
-CACHE_VERSION = b"ws180g-run-magic 1\n"
+CACHE_VERSION = b"ws180g-run-magic 2\n"
 #: How far the box is grown beyond the cell's bounding box before `drc listall why`, in
 #: internal units (nm).
 BOX_GROW = 20000
@@ -88,9 +96,11 @@ def magic_rule_ids(tech: str) -> set[str]:
     return set(_WHY_ID.findall("\n".join(rules)))
 
 
-def cache_key(tech_files: list[Path], derived: Path) -> str:
-    """SHA-256 of the technology files (by name, in name order) and the derived layout."""
+def cache_key(tech_files: list[Path], derived: Path, image_id: str) -> str:
+    """SHA-256 of the technology files (by name, in name order), the derived layout, the
+    box growth of the script (`BOX_GROW`) and the image ID the engine runs in."""
     h = hashlib.sha256(CACHE_VERSION)
+    h.update(f"image {image_id}\nbox_grow {BOX_GROW}\n".encode())
     for path in sorted(tech_files, key=lambda p: p.name):
         data = path.read_bytes()
         h.update(f"tech {path.name} {len(data)}\n".encode())
@@ -143,9 +153,11 @@ def magic_script(cells: list[str]) -> str:
 
 
 def run_magic_many(tech_dir: Path, gds_files: list[Path], out_dir: Path, runner: Runner,
-                   process: Process) -> DrcResults:
+                   process: Process, image_id: str | None = None) -> DrcResults:
     """Run every layout of `gds_files` through the Magic technology in `tech_dir` (one Magic
-    session for all cache misses) and return their results; see the module docstring."""
+    session for all cache misses) and return their results; see the module docstring.
+    `image_id` is the container image the runner uses (default: `docker/IMAGE_ID`)."""
+    image_id = image_id or read_image_id()
     variant, sources = _tech(tech_dir)
     names = [derived_name(g) for g in gds_files]
     repeated = sorted({n for n in names if names.count(n) > 1})
@@ -166,7 +178,7 @@ def run_magic_many(tech_dir: Path, gds_files: list[Path], out_dir: Path, runner:
     misses: list[tuple[Path, str, Path]] = []  # (input, derived name, cache file)
     for gds, name in zip(gds_files, names, strict=True):
         derive_file(gds, derived / name, process, variant)
-        entry = cache / f"{cache_key(tech_files, derived / name)}.json"
+        entry = cache / f"{cache_key(tech_files, derived / name, image_id)}.json"
         if entry.is_file():
             results[gds] = DrcResult.from_json(entry.read_text(encoding="utf-8"))
             results.cache_hits += 1
@@ -204,6 +216,6 @@ def run_magic_many(tech_dir: Path, gds_files: list[Path], out_dir: Path, runner:
 
 
 def run_magic(tech_dir: Path, gds: Path, out_dir: Path, runner: Runner,
-              process: Process) -> DrcResult:
+              process: Process, image_id: str | None = None) -> DrcResult:
     """Run one layout through the Magic technology (`run_magic_many` of one input)."""
-    return run_magic_many(tech_dir, [gds], out_dir, runner, process)[gds]
+    return run_magic_many(tech_dir, [gds], out_dir, runner, process, image_id)[gds]

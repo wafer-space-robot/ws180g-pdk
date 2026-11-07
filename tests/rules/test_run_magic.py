@@ -63,16 +63,25 @@ def _files(root: Path, tech: bytes, rc: bytes, gds: bytes) -> tuple[list[Path], 
     return [root / "v.tech", root / "v.magicrc"], root / "x.gds"
 
 
-def test_cache_key(tmp):
-    key = cache_key(*_files(tmp / "one", b"tech", b"rc", b"gds"))
+IMAGE = "sha256:" + "1" * 64
+
+
+def test_cache_key(tmp, monkeypatch):
+    from ws180g_rules import run_magic
+
+    key = cache_key(*_files(tmp / "one", b"tech", b"rc", b"gds"), IMAGE)
     assert len(key) == 64 and int(key, 16) >= 0
-    assert cache_key(*_files(tmp / "two", b"tech", b"rc", b"gds")) == key
+    assert cache_key(*_files(tmp / "two", b"tech", b"rc", b"gds"), IMAGE) == key
     paths, gds = _files(tmp / "three", b"tech", b"rc", b"gds")
-    assert cache_key(list(reversed(paths)), gds) == key
-    assert cache_key(*_files(tmp / "four", b"tech2", b"rc", b"gds")) != key
-    assert cache_key(*_files(tmp / "five", b"tech", b"rc2", b"gds")) != key
-    assert cache_key(*_files(tmp / "six", b"tech", b"rc", b"gds2")) != key
-    assert cache_key(*_files(tmp / "seven", b"rc", b"tech", b"gds")) != key
+    assert cache_key(list(reversed(paths)), gds, IMAGE) == key
+    assert cache_key(*_files(tmp / "four", b"tech2", b"rc", b"gds"), IMAGE) != key
+    assert cache_key(*_files(tmp / "five", b"tech", b"rc2", b"gds"), IMAGE) != key
+    assert cache_key(*_files(tmp / "six", b"tech", b"rc", b"gds2"), IMAGE) != key
+    assert cache_key(*_files(tmp / "seven", b"rc", b"tech", b"gds"), IMAGE) != key
+    # the image the engine runs in, and how far the box is grown, are part of it
+    assert cache_key(paths, gds, "sha256:" + "2" * 64) != key
+    monkeypatch.setattr(run_magic, "BOX_GROW", run_magic.BOX_GROW + 1000)
+    assert cache_key(paths, gds, IMAGE) != key
 
 
 def test_cache_key_differs_from_klayout():
@@ -208,6 +217,16 @@ def test_run_many_tech_change_misses_the_cache(tech_dir, proc, inputs, tmp):
     rc.write_text(rc.read_text(encoding="utf-8") + "# changed\n", encoding="utf-8")
     runner = FakeRunner({})
     results = run_magic_many(changed, inputs, out, runner, proc)
+    assert len(runner.calls) == 1 and results.cache_hits == 0
+
+
+def test_run_many_image_change_misses_the_cache(tech_dir, proc, inputs, tmp):
+    out = tmp / "work"
+    run_magic_many(tech_dir, inputs, out, FakeRunner({}), proc)
+    runner = FakeRunner({})
+    assert run_magic_many(tech_dir, inputs, out, runner, proc).cache_hits == 2
+    results = run_magic_many(tech_dir, inputs, out, runner, proc,
+                             image_id="sha256:" + "3" * 64)
     assert len(runner.calls) == 1 and results.cache_hits == 0
 
 

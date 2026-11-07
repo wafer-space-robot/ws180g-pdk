@@ -124,3 +124,15 @@ public = true
 "select" = "99dc4b5d0b708c1b0774a11d0f6e3f5d14e369fa019ed851e2827cc3ef659182"
 "thick-active" = "eba44f6483e1fc15b4fa6fde6f92ec27004c26a90e13954f29e161a1751ac143"
 "well" = "35d1c3d5c9d93c6a75ead2d5767836e649ec3321d8ef1b67bf51a2d12283b11b"
+
+[sources.xc018]
+title = "X-FAB XC018 0.18 µm process data sheet rev 3.0 (2008)"
+url = "https://datasheet.datasheetarchive.com/originals/crawler/xfab.com/a3edb8140abfda7a83325589538d6415.pdf"
+licence = "see README: not redistributed"
+retrieved = 2026-11-07
+transcribed = true
+vendored = false
+public = true
+
+[sources.xc018.sha256]
+"xc018_datasheet.pdf" = "f7cc3687bbf409fd50cf53f7502a20dfbed9aef43da634f3e01e08ed1a4db6cf"

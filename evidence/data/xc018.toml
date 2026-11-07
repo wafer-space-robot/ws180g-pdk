@@ -1,0 +1,392 @@
+# SPDX-License-Identifier: Apache-2.0
+# Transcribed by hand from the X-FAB XC018 data sheet pages 5 and 7; see evidence/sources/xc018/README.md.
+
+[[entry]]
+id = "xc018/active/spacing"
+source = "xc018"
+rule = "active"
+column = "spacing"
+kind = "min-space"
+layers = ["active"]
+value = 0.28
+unit = "um"
+text = "Basic Design Rules: Active Area spacing"
+cite = "XC018 data sheet rev 3.0, page 5, Basic Design Rules, row Active Area, column Spacing [µm]"
+guideline = false
+
+[[entry]]
+id = "xc018/active/width"
+source = "xc018"
+rule = "active"
+column = "width"
+kind = "min-width"
+layers = ["active"]
+value = 0.22
+unit = "um"
+text = "Basic Design Rules: Active Area width"
+cite = "XC018 data sheet rev 3.0, page 5, Basic Design Rules, row Active Area, column Width [µm]"
+guideline = false
+
+[[entry]]
+id = "xc018/contact/spacing"
+source = "xc018"
+rule = "contact"
+column = "spacing"
+kind = "min-space"
+layers = ["contact"]
+value = 0.25
+unit = "um"
+text = "Basic Design Rules: Contact spacing"
+cite = "XC018 data sheet rev 3.0, page 5, Basic Design Rules, row Contact, column Spacing [µm]"
+guideline = false
+
+[[entry]]
+id = "xc018/contact/width"
+source = "xc018"
+rule = "contact"
+column = "width"
+kind = "exact-size"
+layers = ["contact"]
+value = 0.22
+unit = "um"
+text = "Basic Design Rules: Contact width"
+cite = "XC018 data sheet rev 3.0, page 5, Basic Design Rules, row Contact, column Width [µm]"
+guideline = false
+
+[[entry]]
+id = "xc018/metal1/spacing"
+source = "xc018"
+rule = "metal1"
+column = "spacing"
+kind = "min-space"
+layers = ["metal1"]
+value = 0.23
+unit = "um"
+text = "Basic Design Rules: Metal 1 spacing"
+cite = "XC018 data sheet rev 3.0, page 5, Basic Design Rules, row Metal 1, column Spacing [µm]"
+guideline = false
+
+[[entry]]
+id = "xc018/metal1/width"
+source = "xc018"
+rule = "metal1"
+column = "width"
+kind = "min-width"
+layers = ["metal1"]
+value = 0.23
+unit = "um"
+text = "Basic Design Rules: Metal 1 width"
+cite = "XC018 data sheet rev 3.0, page 5, Basic Design Rules, row Metal 1, column Width [µm]"
+guideline = false
+
+[[entry]]
+id = "xc018/metal2345/spacing"
+source = "xc018"
+rule = "metal2345"
+column = "spacing"
+kind = "min-space"
+layers = ["metal2", "metal3", "metal4", "metal5"]
+value = 0.28
+unit = "um"
+text = "Basic Design Rules: Metal 2/3/4/5 spacing"
+cite = "XC018 data sheet rev 3.0, page 5, Basic Design Rules, row Metal 2/3/4/5, column Spacing [µm]"
+guideline = false
+
+[[entry]]
+id = "xc018/metal2345/width"
+source = "xc018"
+rule = "metal2345"
+column = "width"
+kind = "min-width"
+layers = ["metal2", "metal3", "metal4", "metal5"]
+value = 0.28
+unit = "um"
+text = "Basic Design Rules: Metal 2/3/4/5 width"
+cite = "XC018 data sheet rev 3.0, page 5, Basic Design Rules, row Metal 2/3/4/5, column Width [µm]"
+guideline = false
+
+[[entry]]
+id = "xc018/ne5/vt"
+source = "xc018"
+rule = "ne5"
+column = "vt"
+kind = "other"
+layers = []
+value = 0.77
+unit = "V"
+text = "Active Devices (typical data), MOS Transistors: 5.0V NMOS ne5, module MOS5LP, |VT|"
+cite = "XC018 data sheet rev 3.0, page 5, MOS Transistors, row 5.0V NMOS ne5 MOS5LP, column |VT| [V]"
+guideline = false
+
+[[entry]]
+id = "xc018/nwell/spacing"
+source = "xc018"
+rule = "nwell"
+column = "spacing"
+kind = "min-space"
+layers = ["nwell"]
+value = 1.4
+unit = "um"
+text = "Basic Design Rules: N-Well spacing"
+cite = "XC018 data sheet rev 3.0, page 5, Basic Design Rules, row N-Well, column Spacing [µm]"
+guideline = false
+
+[[entry]]
+id = "xc018/nwell/width"
+source = "xc018"
+rule = "nwell"
+column = "width"
+kind = "min-width"
+layers = ["nwell"]
+value = 0.86
+unit = "um"
+text = "Basic Design Rules: N-Well width"
+cite = "XC018 data sheet rev 3.0, page 5, Basic Design Rules, row N-Well, column Width [µm]"
+guideline = false
+
+[[entry]]
+id = "xc018/pe5/vt"
+source = "xc018"
+rule = "pe5"
+column = "vt"
+kind = "other"
+layers = []
+value = 0.84
+unit = "V"
+text = "Active Devices (typical data), MOS Transistors: 5.0V PMOS pe5, module MOS5LP, |VT|"
+cite = "XC018 data sheet rev 3.0, page 5, MOS Transistors, row 5.0V PMOS pe5 MOS5LP, column |VT| [V]"
+guideline = false
+
+[[entry]]
+id = "xc018/poly/spacing"
+source = "xc018"
+rule = "poly"
+column = "spacing"
+kind = "min-space"
+layers = ["poly"]
+value = 0.25
+unit = "um"
+text = "Basic Design Rules: Poly-Silicon Gate spacing"
+cite = "XC018 data sheet rev 3.0, page 5, Basic Design Rules, row Poly-Silicon Gate, column Spacing [µm]"
+guideline = false
+
+[[entry]]
+id = "xc018/poly/width"
+source = "xc018"
+rule = "poly"
+column = "width"
+kind = "min-width"
+layers = ["poly"]
+value = 0.18
+unit = "um"
+text = "Basic Design Rules: Poly-Silicon Gate width"
+cite = "XC018 data sheet rev 3.0, page 5, Basic Design Rules, row Poly-Silicon Gate, column Width [µm]"
+guideline = false
+
+[[entry]]
+id = "xc018/polyres/spacing"
+source = "xc018"
+rule = "polyres"
+column = "spacing"
+kind = "min-space"
+layers = ["polyres"]
+value = 0.44
+unit = "um"
+text = "Basic Design Rules: Poly-Silicon Resistor spacing"
+cite = "XC018 data sheet rev 3.0, page 5, Basic Design Rules, row Poly-Silicon Resistor, column Spacing [µm]"
+guideline = false
+
+[[entry]]
+id = "xc018/polyres/width"
+source = "xc018"
+rule = "polyres"
+column = "width"
+kind = "min-width"
+layers = ["polyres"]
+value = 0.44
+unit = "um"
+text = "Basic Design Rules: Poly-Silicon Resistor width"
+cite = "XC018 data sheet rev 3.0, page 5, Basic Design Rules, row Poly-Silicon Resistor, column Width [µm]"
+guideline = false
+
+[[entry]]
+id = "xc018/rm1/rs"
+source = "xc018"
+rule = "rm1"
+column = "rs"
+kind = "other"
+layers = ["metal1"]
+value = 0.095
+unit = "ohm/sq"
+text = "Passive Devices (typical data), Resistors & Conductors: Metal 1 rm1, module MOSLP, MOSST, RS"
+cite = "XC018 data sheet rev 3.0, page 7, Resistors & Conductors, row Metal 1 rm1, column RS [Ω/□]"
+guideline = false
+
+[[entry]]
+id = "xc018/rm2/rs"
+source = "xc018"
+rule = "rm2"
+column = "rs"
+kind = "other"
+layers = ["metal2"]
+value = 0.085
+unit = "ohm/sq"
+text = "Passive Devices (typical data), Resistors & Conductors: Metal 2 rm2, module MOSLP, MOSST, RS"
+cite = "XC018 data sheet rev 3.0, page 7, Resistors & Conductors, row Metal 2 rm2, column RS [Ω/□]"
+guideline = false
+
+[[entry]]
+id = "xc018/rm3/rs"
+source = "xc018"
+rule = "rm3"
+column = "rs"
+kind = "other"
+layers = ["metal3"]
+value = 0.085
+unit = "ohm/sq"
+text = "Passive Devices (typical data), Resistors & Conductors: Metal 3 rm3, module 4METALS, RS"
+cite = "XC018 data sheet rev 3.0, page 7, Resistors & Conductors, row Metal 3 rm3, column RS [Ω/□]"
+guideline = false
+
+[[entry]]
+id = "xc018/rm4/rs"
+source = "xc018"
+rule = "rm4"
+column = "rs"
+kind = "other"
+layers = ["metal4"]
+value = 0.085
+unit = "ohm/sq"
+text = "Passive Devices (typical data), Resistors & Conductors: Metal 4 rm4, module 5METALS, RS"
+cite = "XC018 data sheet rev 3.0, page 7, Resistors & Conductors, row Metal 4 rm4, column RS [Ω/□]"
+guideline = false
+
+[[entry]]
+id = "xc018/rm5/rs"
+source = "xc018"
+rule = "rm5"
+column = "rs"
+kind = "other"
+layers = ["metal5"]
+value = 0.085
+unit = "ohm/sq"
+text = "Passive Devices (typical data), Resistors & Conductors: Metal 5 rm5, module 6METALS, RS"
+cite = "XC018 data sheet rev 3.0, page 7, Resistors & Conductors, row Metal 5 rm5, column RS [Ω/□]"
+guideline = false
+
+[[entry]]
+id = "xc018/rmtp/rs"
+source = "xc018"
+rule = "rmtp"
+column = "rs"
+kind = "other"
+layers = ["topmetal"]
+value = 0.037
+unit = "ohm/sq"
+text = "Passive Devices (typical data), Resistors & Conductors: Top Metal rmtp, module MOSLP, MOSST, RS"
+cite = "XC018 data sheet rev 3.0, page 7, Resistors & Conductors, row Top Metal rmtp, column RS [Ω/□]"
+guideline = false
+
+[[entry]]
+id = "xc018/rmtpl/rs"
+source = "xc018"
+rule = "rmtpl"
+column = "rs"
+kind = "other"
+layers = ["topmetal"]
+value = 0.012
+unit = "ohm/sq"
+text = "Passive Devices (typical data), Resistors & Conductors: Thick Matel rmtpl, module THKMET, RS"
+cite = "XC018 data sheet rev 3.0, page 7, Resistors & Conductors, row Thick Matel rmtpl, column RS [Ω/□]"
+guideline = false
+
+[[entry]]
+id = "xc018/rpp1k1/rs"
+source = "xc018"
+rule = "rpp1k1"
+column = "rs"
+kind = "other"
+layers = []
+value = 1000
+unit = "ohm/sq"
+text = "Passive Devices (typical data), Resistors & Conductors: High resistive Poly rpp1k1 (non-salicided), module HRPOLY, RS"
+cite = "XC018 data sheet rev 3.0, page 7, Resistors & Conductors, row High resistive Poly* rpp1k1, column RS [Ω/□]"
+guideline = false
+
+[[entry]]
+id = "xc018/topmetal/spacing"
+source = "xc018"
+rule = "topmetal"
+column = "spacing"
+kind = "min-space"
+layers = ["topmetal"]
+value = 0.46
+unit = "um"
+text = "Basic Design Rules: Top Metal spacing"
+cite = "XC018 data sheet rev 3.0, page 5, Basic Design Rules, row Top Metal, column Spacing [µm]"
+guideline = false
+
+[[entry]]
+id = "xc018/topmetal/width"
+source = "xc018"
+rule = "topmetal"
+column = "width"
+kind = "min-width"
+layers = ["topmetal"]
+value = 0.44
+unit = "um"
+text = "Basic Design Rules: Top Metal width"
+cite = "XC018 data sheet rev 3.0, page 5, Basic Design Rules, row Top Metal, column Width [µm]"
+guideline = false
+
+[[entry]]
+id = "xc018/topvia/spacing"
+source = "xc018"
+rule = "topvia"
+column = "spacing"
+kind = "min-space"
+layers = ["topvia"]
+value = 0.35
+unit = "um"
+text = "Basic Design Rules: Top Via spacing"
+cite = "XC018 data sheet rev 3.0, page 5, Basic Design Rules, row Top Via, column Spacing [µm]"
+guideline = false
+
+[[entry]]
+id = "xc018/topvia/width"
+source = "xc018"
+rule = "topvia"
+column = "width"
+kind = "exact-size"
+layers = ["topvia"]
+value = 0.36
+unit = "um"
+text = "Basic Design Rules: Top Via width"
+cite = "XC018 data sheet rev 3.0, page 5, Basic Design Rules, row Top Via, column Width [µm]"
+guideline = false
+
+[[entry]]
+id = "xc018/via/spacing"
+source = "xc018"
+rule = "via"
+column = "spacing"
+kind = "min-space"
+layers = ["via1", "via2", "via3", "via4"]
+value = 0.26
+unit = "um"
+text = "Basic Design Rules: Via 1/2/3/4 spacing"
+cite = "XC018 data sheet rev 3.0, page 5, Basic Design Rules, row Via 1/2/3/4, column Spacing [µm]"
+guideline = false
+
+[[entry]]
+id = "xc018/via/width"
+source = "xc018"
+rule = "via"
+column = "width"
+kind = "exact-size"
+layers = ["via1", "via2", "via3", "via4"]
+value = 0.26
+unit = "um"
+text = "Basic Design Rules: Via 1/2/3/4 width"
+cite = "XC018 data sheet rev 3.0, page 5, Basic Design Rules, row Via 1/2/3/4, column Width [µm]"
+guideline = false

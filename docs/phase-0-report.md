@@ -68,8 +68,10 @@ Command: `uv run pytest tests/precheck/test_fixture_retarget.py tests/precheck/t
 ================ 460 passed, 3 deselected in 2988.83s (0:49:48) ================
 ```
 
-Per `metal_top` value (`tmp/t23/gate2-counts.log`, and the run summary
-`tmp/gf180mcu-retarget/reports/gate.json`, copied to `tmp/t23/gate2-gate.json`):
+Per `metal_top` value: cases passed and regressions counted by test id with
+`tools/pytest_log_counts.py` (`tmp/t23/gate2-counts.log`), violations (`dirty`) and run time
+(`seconds`) from the run summary `tmp/gf180mcu-retarget/reports/gate.json`, copied to
+`tmp/t23/gate2-gate.json`:
 
 | `metal_top` | Cases passed (pass fixtures and regressions) | of which regressions | Cases with a GF violation | Run time (s) |
 |---|---|---|---|---|
@@ -96,7 +98,9 @@ Each (a) and (b) left a permanent regression fixture, listed below; the gate tes
 build run them for every `metal_top` value.
 
 **Informative: `gf180mcu_fd_io` through the 30K top-metal rules.** `test_gf180mcu_io_mt30.py::test_io_library_mt30` passed (it only asserts that the run
-completed). Its summary (`tmp/t23/gate2-io-mt30.json`): the 14 top cells of
+completed). Its summary (written by the test to
+`tmp/gf180mcu-retarget/reports/gf180mcu_io_mt30.json`, copied to `tmp/t23/gate2-io-mt30.json`):
+the 14 top cells of
 `gf180mcu_fd_io.gds`, `-rd metal_top=30K -rd decks=metaltop_30k`, no failed cell; 12
 cells report MT30 rules (`MT30.1a`, `MT30.2`, `MT30.3`, `MT30.4`, `MT30.5`, `MT30.6`,
 `MT30.8`), only `gf180mcu_fd_io__brk2` and `gf180mcu_fd_io__brk5` none. For example
@@ -370,32 +374,73 @@ For Phase 1 or for the owner's review:
 
 ## Reproducing this report
 
-On a Linux host with Docker (about 30 GB free for the images), from a clone:
+On a Linux host with Docker (about 30 GB free for the images), from a clone, at a clean
+checkout (the clean build records `git_dirty false` only then). Each command writes the log
+or file this report cites under the same name.
 
 ```sh
 git clone https://github.com/wafer-space-robot/ws180g-pdk.git
 cd ws180g-pdk
 git checkout 4e71697      # the commit of the clean rerun; or main
 uv sync --all-packages
-docker/build                    # the image; prints sha256:2fe8eb94..., equal to docker/IMAGE_ID
+docker/build              # the image; prints sha256:2fe8eb94..., equal to docker/IMAGE_ID
 mkdir -p tmp/t23
-uv run ws180g-build --out tmp/t23/out > tmp/t23/build1.log 2>&1            # cold: 51:42 here
-uv run ws180g-build --out tmp/t23/out2 > tmp/t23/build2.log 2>&1           # warm
-diff -r tmp/t23/out tmp/t23/out2
+
+# Builds: cold, warm, and their output trees compared
+uv run ws180g-build --out tmp/t23/out > tmp/t23/build1.log 2>&1        # cold: 51:42 here
+uv run ws180g-build --out tmp/t23/out2 > tmp/t23/build2.log 2>&1       # warm: 2:10 here
+diff -r tmp/t23/out tmp/t23/out2 > tmp/t23/diff-out-out2.log 2>&1
+uv run ws180g-build --out tmp/t23/out3 > tmp/t23/build3.log 2>&1       # clean rerun
+diff -r tmp/t23/out2 tmp/t23/out3 > tmp/t23/diff-out2-out3.log 2>&1
+cp tmp/build/ws180g005/image-build.log tmp/t23/image-build-build3.log  # the last rebuild's log
+jq -c '.runs | map_values({cases: (.fixtures | length), dirty})' \
+  tmp/t23/out/reports/gf180mcu-gate.json > tmp/t23/build1-gf-summary.log
+jq -c '{git_commit, git_dirty, image_id, image_check}' \
+  tmp/t23/out3/build-manifest.json > tmp/t23/build3-manifest.log
+for o in out out2 out3; do jq -c '{git_commit, git_dirty, image_check}' \
+  tmp/t23/$o/build-manifest.json; done > tmp/t23/manifests-image-check.log
+
+# Gate check 1, and its counts by test id
 uv run pytest tests/rules/test_klayout_fixtures.py tests/rules/test_magic_fixtures.py \
   tests/rules/test_engines_agree.py -rs -v -m sandbox > tmp/t23/gate1.log 2>&1
+uv run tools/pytest_log_counts.py tmp/t23/gate1.log > tmp/t23/gate1-counts.log
+uv run tools/pytest_log_counts.py tmp/t23/gate1.log --key '\[([^/]+)/' \
+  | grep 'test_magic_fixtures.py SKIPPED' > tmp/t23/gate1-skips-by-rule.log
+
+# Gate check 2, its counts, and the two summaries the tests write
 uv run pytest tests/precheck/test_fixture_retarget.py tests/precheck/test_gf180mcu_deck.py \
   tests/precheck/test_gf180mcu_io_mt30.py -rs -v -m sandbox > tmp/t23/gate2.log 2>&1
+uv run tools/pytest_log_counts.py tmp/t23/gate2.log --key='-(9K|11K|30K)\]$' \
+  > tmp/t23/gate2-counts.log
+uv run tools/pytest_log_counts.py tmp/t23/gate2.log --key='\[regressions/[^]]*-(9K|11K|30K)\]$' \
+  | grep -v ' - ' | sed 's/^/regressions: /' >> tmp/t23/gate2-counts.log
+cp tmp/gf180mcu-retarget/reports/gate.json tmp/t23/gate2-gate.json
+cp tmp/gf180mcu-retarget/reports/gf180mcu_io_mt30.json tmp/t23/gate2-io-mt30.json
+
+# Gate check 3, and the uncovered entries by kind (headings of the written report)
 uv run ws180g-evidence-report --markdown tmp/t23/evidence-report.md \
   --json tmp/t23/evidence-report.json > tmp/t23/gate3.log 2>&1
+grep -E '^## Uncovered|^### [a-z-]+ \([0-9]+\)$' tmp/t23/evidence-report.md \
+  > tmp/t23/gate3-uncovered-by-kind.log
+
+# Checkers, host suite, lint, the exception tables, the documentation
 uv run ws180g-check-private > tmp/t23/ws180g-check-private.log 2>&1
 uv run ws180g-check-names > tmp/t23/ws180g-check-names.log 2>&1
 uv run pytest -m "not sandbox" -rs -v > tmp/t23/host-suite.log 2>&1
 uv run ruff check . > tmp/t23/ruff.log 2>&1
 uv run tools/phase0_report_tables.py     # the exception tables above
-uv run sphinx-build -W docs tmp/t23/docs
+uv run sphinx-build -W docs tmp/t23/docs > tmp/t23/sphinx.log 2>&1
+
+# The CI sandbox job (needs push access to a branch of the repository)
+gh workflow run ci.yml --ref <branch>
+gh run watch <run id> > tmp/t23/ci-watch.log 2>&1
+gh run view <run id> --job <sandbox job id> --log > tmp/t23/ci-sandbox-job.log 2>&1
+cut -f3- tmp/t23/ci-sandbox-job.log | sed -E 's/^[0-9T:.-]+Z //' > tmp/t23/ci-sandbox-job-plain.log
+uv run tools/pytest_log_counts.py tmp/t23/ci-sandbox-job-plain.log > tmp/t23/ci-sandbox-counts.log
 ```
 
 Run the `pytest` commands one after another, not at the same time: each clears the basetemp
-`tmp/pytest` when it starts. The CI sandbox job is started with
-`gh workflow run ci.yml --ref <branch>`.
+`tmp/pytest` when it starts. The two `cp` lines must follow the gate-2 run, since a later
+run of those tests overwrites `tmp/gf180mcu-retarget/reports/`. In this report the steps
+ran in a different order on a growing branch ([the tree of each run](#the-tree-of-each-run));
+the order above gives the same evidence on one tree.

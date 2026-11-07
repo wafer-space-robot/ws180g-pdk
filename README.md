@@ -43,7 +43,7 @@ retargets every pass fixture (and the permanent regression fixtures) to GF180MCU
 the public GF180MCU deck for each `metal_top` value (9K, 11K, 30K), one container per value;
 `test_gf180mcu_deck.py` is the positive control (the deck finds known violations in a GF-native
 layout). Results are cached in `tmp/gf180mcu-retarget/` (keyed by the retargeted bytes, the mapping,
-`metal_top`, the deck path and the image ID); a cold run takes roughly 14 minutes per `metal_top`.
+`metal_top`, the deck path and the image ID); a cold run takes about 15 minutes per `metal_top`.
 `tests/precheck/test_gf180mcu_io_mt30.py` is informative only (the public IO library through the 30K
 top-metal rules). The decision log is [`docs/phase-0-retarget-log.md`](docs/phase-0-retarget-log.md).
 
@@ -55,7 +55,7 @@ The full build, `uv run ws180g-build` (default `--out out/`), runs all of it: th
 rule table, decks, tech files, fixtures and manual, the image check (including a `docker/build`
 rebuild of about one minute that proves the image ID reproduces, in every container build), gate
 check 1 for both engines, gate check 2 with the regressions, the release tree `out/ws180g005/` and
-`out/build-manifest.json`. It takes about 45 minutes cold and a few minutes warm (cache in
+`out/build-manifest.json`. It takes about 45 to 50 minutes cold and about two minutes warm (cache in
 `tmp/build/`). `uv run ws180g-build --no-container` skips the image check and the engine runs. The
 documentation: `uv run sphinx-build -W docs out/docs` (after a build, which writes
 `docs/generated/`).

@@ -3,7 +3,7 @@ from decimal import Decimal
 
 import pytest
 from pydantic import ValidationError
-from ws180g_process.model import Layer
+from ws180g_process.model import Datatypes, Layer
 
 EXPECTED_GDS = {"nw": (1, 0), "nd": (2, 0), "pd": (3, 0), "po": (4, 0), "co": (5, 0),
                 "m1": (11, 0), "v1": (12, 0), "m2": (13, 0), "v2": (14, 0), "m3": (15, 0),
@@ -42,3 +42,8 @@ def test_gds_numbers_are_strict_ints_in_range(gds):
 def test_gds_accepts_the_largest_numbers():
     assert Layer(gds=[65535, 65535], kind="drawn", variant="ws180g005", purpose="x").gds == (
         65535, 65535)
+
+
+def test_datatypes_are_strict_gds_numbers():
+    with pytest.raises(ValidationError):
+        Datatypes(drawing=0, label=10.0, pin=2)

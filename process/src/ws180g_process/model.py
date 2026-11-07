@@ -65,9 +65,9 @@ class Layer(Strict):
 class Datatypes(Strict):
     """GDS datatypes the layer map reserves."""
 
-    drawing: int
-    label: int
-    pin: int
+    drawing: GdsNumber
+    label: GdsNumber
+    pin: GdsNumber
 
 
 class Process(Strict):

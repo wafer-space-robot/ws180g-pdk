@@ -21,6 +21,7 @@ jobs:
     # failure is recorded in the Task 23 report and the sandbox tests stay host-run.
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0  # docker/build dates the image from the history of its inputs

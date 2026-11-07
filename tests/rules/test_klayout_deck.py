@@ -177,10 +177,6 @@ def test_cli(tmp):
     assert sorted(p.name for p in (tmp / "cli").iterdir()) == sorted(NAMES)
 
 
-# --- sandbox: the deck runs in KLayout
-
-
-
 def _output_line(checks: str, rid: str) -> str:
     return next(line for line in checks.splitlines() if f'.output("{rid}"' in line)
 
@@ -207,13 +203,14 @@ def test_unsupported_edges_raise(table, process, tmp):
 
 def test_extension_catches_flush_and_inside_ends(deck, table):
     checks = deck[f"{VARIANT}_checks.rb"]
-    assert "\npo_ends_in_df = po.edges.inside(df)\n" in checks
+    assert "\npo_ends_in_df = po.edges.inside(df).interacting(po_and_gate)\n" in checks
     assert "\npo_flush_on_df = po.edges.inside(df.edges).interacting(po_and_gate)\n" in checks
-    assert "\ndf_ends_in_po = df.edges.inside(po)\n" in checks
+    assert "\ndf_ends_in_po = df.edges.inside(po).interacting(df_and_gate)\n" in checks
+    assert "po_ends_in_sab" not in checks and "df_ends_in_sab" not in checks
     for row in table.rows:
         if row.kind == "min-extension":
             line = _output_line(checks, row.id)
-            assert ".enclosed(" in line and ".merged.output(" in line, row.id
+            assert ".first_edges" in line and ".merged.output(" in line, row.id
 
 
 def test_enclosure_catches_straddling_inner_shapes(deck, table):
@@ -306,8 +303,21 @@ PROBES = {
                   {"df.x.po"}, {"po.x.df"}),
     "po_sab_flush": ([("sab", 0, 0, 1000, 2000), ("po", 300, -1000, 540, 2000)],
                      {"po.x.sab"}, {"sab.e.po"}),
+    # poly ending 0.5 inside sab: governed by sab.e.po, not po.x.sab
     "po_sab_inside": ([("sab", 0, 0, 1000, 2000), ("po", 300, -1000, 540, 1500)],
-                      {"po.x.sab"}, set()),
+                      set(), {"po.x.sab"}),
+    "nd_wholly_in_sab": ([("sab", 0, 0, 1800, 1800), ("nd", 400, 400, 1400, 1400)],
+                         set(), {"df.x.sab", "sab.e.df"}),
+    "df_sab_inside": ([("sab", 0, 0, 2000, 2000), ("nd", 300, -1000, 1300, 1600)],
+                      set(), {"df.x.sab"}),
+    "po_wholly_in_sab": ([("sab", 0, 0, 1800, 3000), ("po", 400, 400, 640, 2600)],
+                         set(), {"po.x.sab", "sab.e.po"}),
+    "short_end_cap": ([("nd", 0, 0, 2000, 1000), ("po", 640, -100, 1360, 1400)],
+                      {"po.x.df"}, {"df.x.po"}),
+    "short_df_extension": ([("nd", 440, 0, 2000, 1000), ("po", 640, -400, 1360, 1400)],
+                           {"df.x.po"}, {"po.x.df"}),
+    "po_abutting_df": ([("nd", 0, 0, 1000, 1000), ("po", 1000, 0, 1240, 1000)],
+                       {"po.s.df"}, {"po.x.df", "df.x.po"}),
     "po_sab_legal": ([("sab", 0, 0, 1000, 2000), ("po", 300, -1000, 540, 3000)],
                      set(), {"po.x.sab", "sab.e.po", "sab.s.po"}),
     "df_sab_flush": ([("sab", 0, 0, 2000, 2000), ("nd", 300, -1000, 1300, 2000)],
@@ -330,8 +340,9 @@ def test_review_probes(table, process, sandbox, tmp):
     (work / "list.txt").write_text("".join(f"{n}.gds\n" for n in PROBES), encoding="utf-8")
     (work / "out").mkdir()
     _klayout(sandbox, work, f"{VARIANT}_batch.drc", "-rd", "list=list.txt", "-rd", "out=out")
+    wrong = {}
     for name, (_, fire, quiet) in PROBES.items():
         _, items = _report(work / "out" / f"{name}.lyrdb")
-        assert fire <= set(items), (name, items)
-        assert not quiet & set(items), (name, items)
-        assert all(items[r] == 1 for r in fire), (name, items)
+        if any(items[r] != 1 for r in fire) or quiet & set(items):
+            wrong[name] = dict(items)
+    assert not wrong  # each rule that must fire gives exactly one marker, the others none

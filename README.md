@@ -21,7 +21,7 @@ uv run pytest -rs -v
 uv run ruff check .
 ```
 
-Run `pytest` from the repository root: the basetemp (`tmp/pytest`) is relative to the invocation directory.
+Run `pytest` from the repository root: the basetemp (`tmp/pytest`) is relative to the invocation directory. pytest clears the basetemp at the start of every run, so do not run two `pytest` processes in one checkout at the same time (use a second worktree).
 
 Gate check 1, KLayout half: `uv run pytest tests/rules/test_klayout_fixtures.py -rs -v` (needs the container
 image) runs every per-rule fixture through the KLayout deck in one container run and checks each

@@ -1,3 +1,141 @@
 # SPDX-License-Identifier: Apache-2.0
-# Filled in Task 3.
-masks = []
+# The mask list of ws180g005 and its options, from spec section 5.3 and the drawn-layer
+# table of 5.1. A baseline mask has neither module nor variant; a module mask names its
+# module; an oxide marker names the variant that adds it. Marker layers (mk_*) are not
+# masks. `drawn = false` marks a mask the generator derives from drawn layers.
+
+[[masks]]
+name = "nw"
+drawn = true
+baseline = true
+justification = "The single drawn well holds the PMOS devices; the p-well is implicit, so one well mask suffices."
+
+[[masks]]
+name = "nd"
+drawn = true
+baseline = true
+justification = "N+ active defines NMOS source and drain and the n-well taps, and tells the generator where n-select goes."
+
+[[masks]]
+name = "pd"
+drawn = true
+baseline = true
+justification = "P+ active defines PMOS source and drain and the substrate taps, and tells the generator where p-select goes."
+
+[[masks]]
+name = "po"
+drawn = true
+baseline = true
+justification = "Poly forms every gate and also serves as short interconnect and as a resistor material."
+
+[[masks]]
+name = "co"
+drawn = true
+baseline = true
+justification = "Contacts are the only way from poly or diffusion up to the first metal."
+
+[[masks]]
+name = "m1"
+drawn = true
+baseline = true
+justification = "The first metal carries local cell wiring and is part of the default five-metal stack."
+
+[[masks]]
+name = "v1"
+drawn = true
+baseline = true
+justification = "This via joins m1 to m2 and is part of the default five-metal stack."
+
+[[masks]]
+name = "m2"
+drawn = true
+baseline = true
+justification = "The second metal is routing in the default five-metal stack."
+
+[[masks]]
+name = "v2"
+drawn = true
+baseline = true
+justification = "This via joins m2 to m3 and is part of the default five-metal stack."
+
+[[masks]]
+name = "m3"
+drawn = true
+baseline = true
+justification = "The third metal is routing in the default five-metal stack."
+
+[[masks]]
+name = "v3"
+drawn = true
+baseline = true
+justification = "This via joins m3 to m4 and is part of the default five-metal stack."
+
+[[masks]]
+name = "m4"
+drawn = true
+baseline = true
+justification = "The fourth metal is routing in the default five-metal stack."
+
+[[masks]]
+name = "v4"
+drawn = true
+baseline = true
+justification = "This via lands m4 on the top metal and is part of the default five-metal stack."
+
+[[masks]]
+name = "mtop"
+drawn = true
+baseline = true
+justification = "The top metal carries power and pads, and any top-metal thickness in the allowed range is baseline."
+
+[[masks]]
+name = "pad"
+drawn = true
+baseline = true
+justification = "Every die needs openings in the passivation to bond or probe its pads."
+
+[[masks]]
+name = "sab"
+drawn = true
+baseline = true
+justification = "Silicide block is the one module the baseline includes, because every target offers it and it gives unsilicided resistors and ESD ballast."
+
+[[masks]]
+name = "nsel"
+drawn = false
+baseline = true
+justification = "The n+ implant mask is derived from the drawn n-diffusion, so designers never draw it."
+
+[[masks]]
+name = "psel"
+drawn = false
+baseline = true
+justification = "The p+ implant mask is derived from the drawn p-diffusion, so designers never draw it."
+
+[[masks]]
+name = "dnw"
+drawn = true
+baseline = false
+module = "deep-n-well"
+justification = "Deep n-well isolates NMOS from the substrate, but it is a foundry option, so it is an optional module."
+
+[[masks]]
+name = "rhi"
+drawn = true
+baseline = false
+module = "high-res-poly"
+justification = "The high-resistance poly implant gives compact resistors of about 1 kohm/sq, but it is optional at the targets, so it is a module."
+
+[[masks]]
+name = "ox_3v3"
+drawn = true
+baseline = false
+variant = "ws180g035"
+justification = "The 3.3 V oxide marker is no mask of ws180g005; it selects the second gate oxide of the variants that add it."
+
+[[masks]]
+name = "ox_1v8"
+drawn = true
+baseline = false
+variant = "ws180g105"
+justification = "The 1.8 V oxide marker is no mask of ws180g005; it selects the thin gate oxide of the variants that add it."

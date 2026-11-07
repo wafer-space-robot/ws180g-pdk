@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+# Adapted from mithro/gf180-tcad tools/sandbox-run (Apache-2.0)
+# Run a command in the resource-limited ws180g-pdk container (docker/IMAGE, built by docker/build).
+#   build/sandbox-run [--mem 4g] [--cpus 2] [--pids 2048] [--image REF] --workdir DIR
+#                     [--network none|bridge] -- CMD...
+# The repo is mounted read-only at /work/src, DIR read-write at /work/out (the working directory).
+# The command runs as the invoking uid:gid with no capabilities, a read-only root filesystem, a
+# 1 GiB /tmp, no network by default, and memory == memory+swap (no swap).
+# Exit code is CMD's (137 on OOM kill; 2 when sandbox-run itself refuses). Only CMD's output goes
+# to stdout. Every heavy EDA job (KLayout, Magic, netgen, ngspice) runs through this, never bare.
+set -euo pipefail
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+MEM=4g CPUS=2 PIDS=2048 NETWORK=none WORKDIR=""
+IMAGE="$(head -n1 "$REPO/docker/IMAGE")"
+
+die() { echo "sandbox-run: $*" >&2; exit 2; }
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --mem) MEM="${2:?}"; shift 2 ;;
+        --cpus) CPUS="${2:?}"; shift 2 ;;
+        --pids) PIDS="${2:?}"; shift 2 ;;
+        --image) IMAGE="${2:?}"; shift 2 ;;
+        --workdir) WORKDIR="${2:?}"; shift 2 ;;
+        --network) NETWORK="${2:?}"; shift 2 ;;
+        --) shift; break ;;
+        *) die "unknown option: $1" ;;
+    esac
+done
+[ $# -gt 0 ] || die "no command given (use -- CMD...)"
+case "$NETWORK" in none|bridge) ;; *) die "--network must be none or bridge" ;; esac
+[[ "$MEM" =~ ^[1-9][0-9]*[kmg]$ ]] || die "--mem must be a size like 4g: $MEM"
+[[ "$CPUS" =~ ^[0-9]+(\.[0-9]+)?$ ]] || die "--cpus must be a number: $CPUS"
+[[ "$PIDS" =~ ^[1-9][0-9]*$ ]] || die "--pids must be a positive integer: $PIDS"
+[ -n "$WORKDIR" ] || die "--workdir is required"
+[ -d "$WORKDIR" ] || die "workdir does not exist: $WORKDIR"
+WORKDIR="$(cd "$WORKDIR" && pwd -P)"
+REPO="$(cd "$REPO" && pwd -P)"
+# The workdir is mounted read-write. Refuse the filesystem root, $HOME and its ancestors, and
+# every directory whose contents run on the host: the repo (only its gitignored scratch tmp/ may
+# be written), the git dir and git common dir of its checkout (hooks, config; for a worktree they
+# are outside the repo) and the main working tree that owns that common dir. For each, the
+# directory itself and any ancestor of it are refused, and so is anything inside the git dirs.
+# Unrelated directories (sibling checkouts, scratch dirs) are fine.
+[ "$WORKDIR" != / ] || die "workdir must not be the filesystem root"
+
+# ancestor WHAT DIR: refuse the workdir if it is DIR or an ancestor of DIR.
+ancestor() {
+    case "$2/" in
+        "$WORKDIR"/*) die "workdir must not be $1 ($2) or an ancestor of it: $WORKDIR" ;;
+    esac
+}
+# inside WHAT DIR: refuse the workdir if it is inside DIR.
+inside() {
+    case "$WORKDIR/" in
+        "$2"/*) die "workdir must not be inside $1 ($2): $WORKDIR" ;;
+    esac
+}
+
+ancestor "the repo root" "$REPO"
+case "$WORKDIR/" in
+    "$REPO"/tmp/*) ;;
+    "$REPO"/*) die "workdir inside the repo must be under its tmp/: $WORKDIR" ;;
+esac
+
+# $HOME: from the environment, else the passwd entry; unknown means refuse to run.
+home_dir() {
+    local h="${HOME:-}" entry
+    if [ -z "$h" ] || [ ! -d "$h" ]; then
+        entry="$(getent passwd "$(id -u)")" || return 1
+        IFS=: read -r _ _ _ _ _ h _ <<< "$entry"
+        [ -n "$h" ] && [ -d "$h" ] || return 1
+    fi
+    (cd "$h" && pwd -P)
+}
+HOME_DIR="$(home_dir)" || die "cannot determine the home directory (\$HOME or passwd entry)"
+case "$HOME_DIR/" in
+    "$WORKDIR"/*) die "workdir must not be \$HOME ($HOME_DIR) or an ancestor of it: $WORKDIR" ;;
+esac
+
+# git: a checkout (.git dir or worktree .git file) must resolve, or nothing runs. The GIT_*
+# variables are dropped so they cannot point git at a decoy.
+if [ -e "$REPO/.git" ]; then
+    GIT="$(type -P git)" || die "git is not installed, cannot locate the git dirs of $REPO"
+    git_path() {
+        local out
+        out="$(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_COMMON_DIR -u GIT_INDEX_FILE \
+            "$GIT" -C "$REPO" rev-parse --path-format=absolute "$1")" && [ -d "$out" ] &&
+            (cd "$out" && pwd -P)
+    }
+    GIT_COMMON="$(git_path --git-common-dir)" || die "cannot locate the git common dir of $REPO"
+    GIT_OWN="$(git_path --git-dir)" || die "cannot locate the git dir of $REPO"
+    ancestor "the git common dir" "$GIT_COMMON"
+    inside "the git common dir" "$GIT_COMMON"
+    ancestor "the git dir" "$GIT_OWN"
+    inside "the git dir" "$GIT_OWN"
+    if [ "$(basename "$GIT_COMMON")" = .git ]; then
+        ancestor "the main git checkout" "$(dirname "$GIT_COMMON")"
+    fi
+fi
+
+# The workspace members' sources, importable from the read-only mount.
+PYPATH=""
+for src in "$REPO"/*/src; do
+    [ -f "$(dirname "$src")/pyproject.toml" ] || continue
+    PYPATH="${PYPATH:+$PYPATH:}/work/src/$(basename "$(dirname "$src")")/src"
+done
+
+NAME="ws180g-sandbox-$(cat /proc/sys/kernel/random/uuid)"
+cleanup() { docker rm -f "$NAME" > /dev/null 2>&1 || true; }
+trap 'cleanup; exit 130' INT
+trap 'cleanup; exit 143' TERM
+
+docker run --rm --name "$NAME" \
+    --entrypoint "" \
+    --cap-drop ALL --security-opt no-new-privileges \
+    --memory "$MEM" --memory-swap "$MEM" --cpus "$CPUS" --pids-limit "$PIDS" \
+    --network "$NETWORK" \
+    --read-only --tmpfs /tmp:rw,size=1g,exec \
+    --user "$(id -u):$(id -g)" \
+    -e HOME=/tmp/home -e USER=ws180g -e LOGNAME=ws180g -e "PYTHONPATH=$PYPATH" \
+    -e WS180G_IN_SANDBOX=1 \
+    -v "$REPO:/work/src:ro" -v "$WORKDIR:/work/out:rw" --workdir /work/out \
+    "$IMAGE" \
+    sh -c 'mkdir -p "$HOME" && exec "$@"' -- "$@" &
+PID=$!
+rc=0
+wait "$PID" || rc=$?
+# a trapped signal interrupts `wait` (rc>128 from our own signal is handled by the traps)
+exit "$rc"

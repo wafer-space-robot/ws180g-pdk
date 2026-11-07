@@ -1,8 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Test helpers. `evidence_dir_with` arrives with the evidence package (Task 4)."""
+"""Test helpers."""
 
 import re
+import tempfile
 from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 def _literal(value: object) -> str:
@@ -41,3 +44,28 @@ def set_toml(path: Path, keys: list[str], value: object) -> None:
             path.write_text("".join(lines))
             return
     raise KeyError(".".join(keys))
+
+
+def evidence_dir_with(entries: list[dict], sources: dict) -> Path:
+    """A fresh evidence data directory holding `sources.toml` and `entries.toml`.
+
+    `sources` maps a source id to its table; each entry is one `[[entry]]` table and gets
+    `rule`, `text` and `cite` filled in when it lacks them. The directory lies under the
+    repository's `tmp/`."""
+    root = REPO_ROOT / "tmp" / "evidence-dirs"
+    root.mkdir(parents=True, exist_ok=True)
+    out = Path(tempfile.mkdtemp(dir=root))
+    lines: list[str] = []
+    for name, table in sources.items():
+        lines.append(f"[sources.{name}]")
+        lines += [f"{k} = {_literal(v)}" for k, v in table.items()]
+        lines.append("")
+    (out / "sources.toml").write_text("\n".join(lines))
+    lines = []
+    for entry in entries:
+        filled = {"rule": entry["id"].split("/")[1], "text": "", "cite": "test"} | entry
+        lines.append("[[entry]]")
+        lines += [f"{k} = {_literal(v)}" for k, v in filled.items()]
+        lines.append("")
+    (out / "entries.toml").write_text("\n".join(lines))
+    return out

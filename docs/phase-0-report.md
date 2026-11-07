@@ -25,7 +25,7 @@ the owner's agreement. The deliverable "library repositories created" (Task 22) 
 not done: Phase 0 is declared complete without it. The full container build exits 0,
 the image ID reproduces, a warm rebuild gives an identical output tree, and the CI
 sandbox job on a hosted runner rebuilt the image to the same ID and passed every
-container test.
+container test it selects (all but the `slow` image-reproducibility test, see [CI](#ci)).
 
 ## Gate check 1: both DRC engines pass every fixture
 
@@ -191,6 +191,7 @@ gate runs execute. "Uncommitted" means files in the worktree that a later commit
 | Clean build (`build3.log`) | `4e71697`, clean |
 | Sphinx (`sphinx.log`) | the tree committed as `171bd3a` |
 
+(ci)=
 ## CI
 
 The `sandbox` job of `.github/workflows/ci.yml` (manual dispatch) was run once, with
@@ -212,7 +213,11 @@ which includes gates 1 and 2 (264 KLayout, 241 Magic and 240 agreement tests, 45
 retarget cases, 3 positive controls, the IO run; counted by test id in
 `tmp/t23/ci-sandbox-counts.log`). The `host` job of the same run also
 passed. So the hosted runner can run the sandbox job, and gate checks 1 and 2 now have
-a second, independent run.
+a second, independent run. The marker expression `sandbox and not slow` deselects the only
+`slow` test file, `tests/sandbox/test_image_reproducible.py` (rebuild the image and compare the
+digest); neither this job nor this report ran it. Its check stands in two other places: every
+build's image check (`"image_check": "rebuilt, ID reproduced"` in the three manifests above),
+and the hosted runner's own `docker/build` printing the same digest as `docker/IMAGE_ID`.
 
 ## Recorded exceptions
 

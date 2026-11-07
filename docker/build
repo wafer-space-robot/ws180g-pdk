@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+# Adapted from mithro/gf180-tcad docker/base/build (Apache-2.0)
+# Reproducible build of the ws180g-pdk base image.
+#   docker/build [--tag REF]... [--push] [--no-cache]
+# Without --push the image is loaded into the local docker image store under every --tag (default
+# ws180g-pdk-base:local); its image ID is the config digest. With --push it is pushed to the
+# registry under every --tag (which then must name ghcr.io/wafer-space-robot/ws180g-pdk-base).
+# Prints the image config digest (== docker/IMAGE_ID when reproducible) on stdout; the build log
+# goes to stderr.
+#
+# docker/IMAGE holds the reference build/sandbox-run runs: ws180g-pdk-base:local for now. Once a
+# push exists it becomes ghcr.io/wafer-space-robot/ws180g-pdk-base@sha256:<registry digest>.
+#
+# Reproducibility: a pinned BuildKit (docker-container driver), SOURCE_DATE_EPOCH = commit time of
+# the last change to the build inputs (so committing IMAGE_ID/IMAGE/versions.json does not change
+# it), rewrite-timestamp=true, no provenance/SBOM attestations, single platform.
+set -euo pipefail
+
+BUILDKIT_IMAGE="moby/buildkit:v0.34.0@sha256:b059f8d7226d0b326bc871af489a5dddf65e36af4d20d14251b072974d9ee87c"
+# The builder container is memory-capped (no swap): the build only runs a pip install, and the
+# host is shared. The image does not depend on the builder's limits.
+BUILDER="buildkit_v0.34.0_ws180g"
+BUILDER_MEMORY=4g
+NAME="ghcr.io/wafer-space-robot/ws180g-pdk-base"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(cd "$HERE/.." && pwd)"
+
+PUSH=false NO_CACHE=() TAGS=()
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --push) PUSH=true; shift ;;
+        --tag) TAGS+=("${2:?}"); shift 2 ;;
+        --no-cache) NO_CACHE=(--no-cache); shift ;;
+        *) echo "build: unknown option: $1" >&2; exit 2 ;;
+    esac
+done
+if [ "${#TAGS[@]}" -eq 0 ]; then
+    "$PUSH" && { echo "build: --push needs at least one --tag ($NAME:...)" >&2; exit 2; }
+    TAGS=("ws180g-pdk-base:local")
+fi
+if "$PUSH"; then
+    for t in "${TAGS[@]}"; do
+        case "$t" in
+            "$NAME":*) ;;
+            *) echo "build: --push tag is not $NAME:...: $t" >&2; exit 2 ;;
+        esac
+    done
+fi
+command -v jq > /dev/null || { echo "build: jq is required to read the build metadata" >&2; exit 2; }
+
+INPUTS=(docker/Dockerfile docker/requirements.lock)
+if [ -n "$(git -C "$REPO" status --porcelain -- "${INPUTS[@]}")" ]; then
+    echo "build: uncommitted changes in ${INPUTS[*]}; commit them first" >&2
+    exit 2
+fi
+SOURCE_DATE_EPOCH="$(git -C "$REPO" log -1 --format=%ct -- "${INPUTS[@]}")"
+[ -n "$SOURCE_DATE_EPOCH" ] || { echo "build: cannot date ${INPUTS[*]} (shallow clone?)" >&2; exit 2; }
+export SOURCE_DATE_EPOCH
+echo "build: SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" >&2
+
+# Scratch under the repo's gitignored tmp/, never the host's /tmp.
+mkdir -p "$REPO/tmp"
+METADATA="$(mktemp "$REPO/tmp/docker-build-metadata.XXXXXX")"
+trap 'rm -f "$METADATA"' EXIT
+
+if ! docker buildx inspect "$BUILDER" > /dev/null 2>&1; then
+    docker buildx create --name "$BUILDER" --driver docker-container \
+        --driver-opt "image=$BUILDKIT_IMAGE" --driver-opt "memory=$BUILDER_MEMORY" \
+        --driver-opt "memory-swap=$BUILDER_MEMORY" >&2
+fi
+
+NAMES="$(IFS=,; echo "${TAGS[*]}")"
+if "$PUSH"; then
+    OUTPUT="type=image,\"name=$NAMES\",push=true,rewrite-timestamp=true"
+else
+    OUTPUT="type=docker,\"name=$NAMES\",rewrite-timestamp=true"
+fi
+docker buildx build --builder "$BUILDER" --progress plain \
+    --platform linux/amd64 --provenance=false --sbom=false \
+    "${NO_CACHE[@]}" \
+    --build-arg "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" \
+    --output "$OUTPUT" \
+    --metadata-file "$METADATA" \
+    "$HERE" >&2
+
+DIGEST="$(jq -er '."containerimage.config.digest"' "$METADATA")"
+echo "$DIGEST"

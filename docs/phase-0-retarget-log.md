@@ -40,8 +40,17 @@ with the GF rule text and the fixture.
 ## Open points for the controller
 
 - `layergen` limitation (recorded in `tests/layergen/test_derive.py`): an nd bar of width
-  `df.w` butted to pd on both long sides gets an nsel only `df.w` wide (below `nsel.w`); no
-  pass fixture draws it.
+  `df.w` butted to pd on both long sides gets an nsel only `df.w` wide (below `nsel.w` and GF
+  NP.1), and the psel on its two sides face each other across it (below `psel.s`, GF PP.2);
+  no pass fixture draws it.
+- The mirror (`test_known_limitation_narrow_pd_between_nd_gets_a_df_w_wide_psel`): a pd bar
+  of width `df.w` butted to nd on both long sides gets a psel that is exactly the bar, 0.36 um
+  wide (below `psel.w` 0.48 and GF PP.1 0.40) with no extension beyond its short ends (GF
+  PP.5b); nsel rings it, a polygon with a hole touching the pd on all four sides. Before
+  Task 18 the psel at least extended x beyond the short ends; the `open` step removes that
+  band with the rest of the bar-wide psel. No pass fixture draws it. The notes of
+  `rules.nsel.w`, `nsel.s`, `psel.w` and `psel.s`, which claimed the select width by
+  construction without exception, now say where the construction fails.
 
 ## Tally
 

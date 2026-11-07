@@ -204,6 +204,29 @@ def test_known_limitation_narrow_nd_between_pd_gets_a_df_w_wide_nsel(process, x)
     assert (rect(str(w), "0", str(w + 1), "2") - psel).is_empty()
 
 
+def test_known_limitation_narrow_pd_between_nd_gets_a_df_w_wide_psel(process):
+    """KNOWN LIMITATION, recorded not fixed (the mirror of the nd bar above): a pd bar of
+    width df.w butted to nd on both long sides gets a psel that is exactly the bar, df.w
+    wide (below psel.w and GF PP.1 0.40) and with no extension beyond its short ends (GF
+    PP.5b): the band beyond each end is narrower than psel.w, so `open` removes the whole
+    bar-wide psel and `P - nd` restores only the bar. nsel then rings the bar, a polygon
+    with a hole that touches the pd on all four sides. No Task 14 pass fixture draws it;
+    see docs/phase-0-retarget-log.md (open points) and the notes of rules.psel.w/.s."""
+    w = process.rules["df.w"].value
+    layout, top = new_layout()
+    box(layout, top, "nd", "-1", "0", "0", "2", process)
+    box(layout, top, "pd", "0", "0", str(w), "2", process)
+    box(layout, top, "nd", str(w), "0", str(w + 1), "2", process)
+    derive(layout, process)
+    nsel = region(layout, top, "nsel", process).merged()
+    psel = region(layout, top, "psel", process).merged()
+    assert (nsel & psel).is_empty()
+    assert (psel ^ rect("0", "0", str(w), "2")).is_empty()
+    assert psel.bbox().width() < dbu(process.rules["psel.w"].value)
+    assert nsel.count() == 1
+    assert next(iter(nsel.each())).holes() == 1
+
+
 def test_nsel_of_a_df_w_bar_is_at_least_nsel_w(process, x):
     w = process.rules["df.w"].value
     layout, top = new_layout()

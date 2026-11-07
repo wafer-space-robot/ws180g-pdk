@@ -2,8 +2,10 @@
 """Gate check 1, KLayout half (Task 15): every per-rule fixture of Task 14 through the
 KLayout deck in the container.
 
-The fixtures are written at collection time so the test can be parametrised over them; the
-engine runs once for all of them (one container, `ws180g005_batch.drc`) in a session-scoped
+Collection only computes the fixture list (from the fixture generator's cases, writing
+nothing), so a unit run (`-m "not sandbox"`) never touches a gate run's files; the session
+fixture `fixture_files`, used by the sandbox tests only, writes them into
+`tmp/klayout-fixtures/fixtures/`. The engine runs once for all of them (one container, `ws180g005_batch.drc`) in a session-scoped
 fixture, and each parametrised test reads its result. Results are cached by the bytes of the
 deck and of the derived layout, so a rerun with nothing changed starts no container; delete
 `tmp/klayout-fixtures/` to force a fresh engine run."""
@@ -15,7 +17,7 @@ from pathlib import Path
 import klayout.db as kdb
 import pytest
 from ws180g_process.load import load_process
-from ws180g_rules.fixtures import write_fixtures
+from ws180g_rules.fixtures import Fixture, Kit, cases, write_fixtures
 from ws180g_rules.klayout_deck import write_klayout_deck
 from ws180g_rules.run_klayout import run_klayout_many
 from ws180g_rules.table import RuleTable
@@ -28,12 +30,33 @@ PROCESS = load_process()
 TABLE = RuleTable.from_process(PROCESS)
 
 
-def _write_fixtures():
+def planned_fixtures(out_dir: Path) -> list[Fixture]:
+    """The fixtures `write_fixtures(TABLE, PROCESS, out_dir)` writes, in its order, computed
+    from the generator's cases without writing a file."""
+    kit = Kit(TABLE, PROCESS)
+    return [Fixture(row.id, name, out_dir / row.id / f"{expect}_{name}.gds", expect)
+            for row in TABLE.checkable() for expect, name, _ in cases(row, kit)
+            if not (expect == "fail" and row.implied_by is not None)]
+
+
+FIXTURES = planned_fixtures(WORK / "fixtures")
+
+
+@pytest.fixture(scope="session")
+def fixture_files() -> list[Fixture]:
+    """Write the fixtures into `tmp/klayout-fixtures/fixtures/` (for the engine runs only)."""
     shutil.rmtree(WORK / "fixtures", ignore_errors=True)
-    return write_fixtures(TABLE, PROCESS, WORK / "fixtures")
+    written = write_fixtures(TABLE, PROCESS, WORK / "fixtures")
+    assert written == FIXTURES
+    return written
 
 
-FIXTURES = _write_fixtures()
+def test_planned_fixtures_match_the_written_ones(tmp_path):
+    """The list computed at collection is what `write_fixtures` writes (here into pytest's
+    own temporary directory, not the gate's)."""
+    written = write_fixtures(TABLE, PROCESS, tmp_path / "fixtures")
+    assert written == planned_fixtures(tmp_path / "fixtures")
+    assert all(f.path.is_file() for f in written)
 
 
 @pytest.fixture(scope="session")
@@ -42,7 +65,7 @@ def deck_dir() -> Path:
 
 
 @pytest.fixture(scope="session")
-def klayout_results(sandbox, deck_dir):
+def klayout_results(sandbox, deck_dir, fixture_files):
     """The results of every fixture, from one batch run (or the cache)."""
     return run_klayout_many(deck_dir, [f.path for f in FIXTURES], WORK / "run", sandbox.run,
                             PROCESS)

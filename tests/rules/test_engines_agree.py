@@ -9,7 +9,7 @@ records that Magic's set differs (`magic_markers(fixture) != set(fixture.markers
 test asserts each engine against its own expected set instead and prints the exception."""
 
 import pytest
-from test_klayout_fixtures import FIXTURES, TABLE, deck_dir, klayout_results  # noqa: F401
+from test_klayout_fixtures import FIXTURES, TABLE, deck_dir, fixture_files, klayout_results  # noqa: F401
 from test_magic_fixtures import magic_results, tech_dir  # noqa: F401
 from ws180g_tech.magic import MAGIC_EXCEPTIONS, magic_markers
 

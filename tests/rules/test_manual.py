@@ -50,8 +50,8 @@ def test_one_row_per_rule_one_section_per_layer(table):
 
 def test_columns(table):
     text = manual_text(table)
-    assert ("| id | rule | value | evidence | margin applied | margin achieved | composed of "
-            "| engines | condition | implied by |") in text
+    assert ("| id | kind | layers | value | note | evidence | margin applied | margin achieved "
+            "| composed of | engines | condition | implied by |") in text
     line = _row_line(text, "nd.s.pgate")
     assert "`rules.sel.x`" in line  # composed-of
     implied = next(r for r in table.rows if r.implied_by)
@@ -86,3 +86,32 @@ def test_manual_does_not_read_the_evidence_set():
 
     source = Path(manual.__file__).read_text(encoding="utf-8")
     assert "ws180g_evidence" not in source
+
+
+def test_rows_say_what_the_rule_measures(table):
+    """Each row carries the rule's kind and layer expressions, not only its derivation."""
+    text = manual_text(table)
+    line = _row_line(text, "nw.e.nd")
+    assert "min-enclosure" in line
+    assert "nw, nd" in line
+    edged = next(r for r in table.rows if r.edges)
+    assert f"edges {edged.edges} {edged.edge_layer}" in _row_line(text, edged.id)
+    # layer expressions keep their operators, escaped for the table
+    assert "nd\\|pd" in _row_line(text, "df.w")
+
+
+def test_sections_follow_the_rule_id(table):
+    """A rule sits under the layer, alias or group its id starts with: df.* under df (an
+    alias, expanded in the layer expressions), nw.tap.dmax under nw."""
+    text = manual_text(table)
+    sections = re.findall(r"^## (.+)$", text, re.MULTILINE)
+    assert "`df`" in sections
+
+    def section_of(rule_id: str) -> str:
+        at = text.index(f"| `{rule_id}` |")
+        return re.findall(r"^## (.+)$", text[:at], re.MULTILINE)[-1]
+
+    assert section_of("df.w") == "`df`"
+    assert section_of("nw.tap.dmax") == "`nw`"
+    assert section_of("nw.e.nd") == "`nw`"
+    assert section_of("grid") == "Whole layout"

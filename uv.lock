@@ -971,10 +971,14 @@ version = "0.0.0"
 source = { editable = "build" }
 dependencies = [
     { name = "pydantic" },
+    { name = "ws180g-process" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pydantic", specifier = ">=2.11" }]
+requires-dist = [
+    { name = "pydantic", specifier = ">=2.11" },
+    { name = "ws180g-process", editable = "process" },
+]
 
 [[package]]
 name = "ws180g-evidence"
@@ -1041,6 +1045,7 @@ source = { editable = "rules" }
 dependencies = [
     { name = "klayout" },
     { name = "pydantic" },
+    { name = "ws180g-layergen" },
     { name = "ws180g-process" },
 ]
 
@@ -1048,6 +1053,7 @@ dependencies = [
 requires-dist = [
     { name = "klayout", specifier = ">=0.30.12" },
     { name = "pydantic", specifier = ">=2.11" },
+    { name = "ws180g-layergen", editable = "layergen" },
     { name = "ws180g-process", editable = "process" },
 ]
 

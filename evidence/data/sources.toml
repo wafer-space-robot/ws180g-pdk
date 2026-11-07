@@ -149,3 +149,11 @@ public = true
 
 [sources.gf180mcu-models.sha256]
 "sm141064.ngspice" = "69a7ab877344a6d477fdd11440457f64e7ad88a624504a737a161da463de8bc8"
+
+[sources.onc18]
+title = "onsemi ONC18 data sheet ONC181818/D rev 0 (2016)"
+url = "https://www.onsemi.com/site/pdf/ONC181818-D.PDF"
+licence = "see README: not redistributed"
+transcribed = false
+vendored = false
+public = true

@@ -34,7 +34,15 @@ JOBS = 2
 
 #: Policy (c): pass fixtures excluded from gate check 2, `(rule id, name)` -> (GF rule,
 #: reason). See docs/phase-0-retarget-log.md.
-EXCLUDED: dict[tuple[str, str], tuple[str, str]] = {}
+_DN3 = ("DN.3", ("each DNWELL must be directly surrounded by a PCOMP guard ring tied to the "
+        "substrate; the dnw fixtures draw a bare deep n-well, and the ring topology is the "
+        "deep-n-well module's open item"))
+EXCLUDED: dict[tuple[str, str], tuple[str, str]] = {
+    ("dnw.w", "min"): _DN3,
+    ("dnw.w", "min_plus_grid"): _DN3,
+    ("dnw.s", "min"): _DN3,
+    ("dnw.s", "min_plus_grid"): _DN3,
+}
 
 
 def _cases() -> list[tuple[str, Path]]:
@@ -102,3 +110,5 @@ def test_exclusions_are_recorded():
     for (rule_id, name), (gf_rule, reason) in EXCLUDED.items():
         assert gf_rule and reason
         assert f"{rule_id}/{name}" in log
+        # a stale exclusion (the fixture is gone or renamed) is an error
+        assert (WORK / "fixtures" / rule_id / f"pass_{name}.gds").is_file(), (rule_id, name)

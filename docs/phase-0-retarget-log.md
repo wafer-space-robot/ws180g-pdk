@@ -30,3 +30,24 @@ with the GF rule text and the fixture.
 
 | date | fixture | GF rule | outcome | reason |
 |---|---|---|---|---|
+| 2026-11-07 | `nd.s.pgate/min`, `nd.s.pgate/min_plus_grid` (n-tap butted to a p-FET source) | PP.1 (Pplus width 0.4) | (b) `layergen` | `psel = close(P.sized(x)) - nd` left an x-by-x (0.28 um) prong of Pplus beyond the butting edge on each side of the tap, narrower than PP.1 and than the generic `psel.w` 0.48 itself. `derive` now opens psel by `psel.w` (`open(close(P.sized(x)) - nd) \| (P - nd)`); the overhang falls to nsel and the selects meet on the straight butting line (NP.3d/PP.3d). Regression `butted_ntap_pfet`. |
+| 2026-11-07 | `pd.s.ngate/min`, `pd.s.ngate/min_plus_grid`, `df.s.np/butted`, `co.s.butt/min`, `co.s.butt/min_plus_grid`, `co.no.butt/co_on_butt` (p-tap or pd butted to nd) | PP.1; NP.5b (Nplus extension beyond COMP 0.16) | (b) `layergen` | the same prong: Pplus took the corner of the overhang next to the nd, so Nplus did not extend beyond that COMP edge. Fixed by the same `derive` change. Regression `butted_ptap_nfet`. |
+| 2026-11-07 | `dnw.w/min`, `dnw.w/min_plus_grid`, `dnw.s/min`, `dnw.s/min_plus_grid` | DN.3 ("Each DNWELL shall be directly surrounded by PCOMP guard ring tied to the P-substrate potential") | (c) excluded | the dnw fixtures draw a bare deep n-well; the guard-ring topology is the deep-n-well module's open item (expected by the brief). Listed in `EXCLUDED` of the test. |
+| 2026-11-07 | `m4.e.v4/min`, `m4.e.v4/min_plus_grid`, `mtop.e.v4/min`, `mtop.e.v4/min_plus_grid` (30K only) | MT30.8 ("There shall be minimum 2X2 array of vias (top vias) at one location connecting to 3um thick top metal") | (b) fixture | the fixtures shifted the lower row of the 2 x 2 v4 array 0.35 um left (so a fail fixture has one cut at the margin); the deck sizes each via cluster over-under by 1 um and flags a non-rectangular cluster. Pass fixtures now draw an aligned array (fail fixtures keep the shift). Regression `v4_array_enclosure`; new Task 14 test `test_pass_fixture_v4_clusters_are_rectangular_arrays`. |
+| 2026-11-07 | `v4.s/min_plus_grid` (30K only) | MT30.8 | (b) fixture | the lower pair of the cluster stayed at the minimum space 0.48 while the upper pair was at 0.485: a 5 nm step, not a rectangle. An aligned array at 0.485 would split into two 2-cut clusters for the generic `mtop.v4.array` (Task 15 rerun showed it), so the fixture now draws two minimum-space 2 x 2 arrays side by side at the space under test. Regression `v4_array_space`. |
+
+## Open points for the controller
+
+- The generic topology rule `mtop.v4.array` accepts any cluster of at least 2 x 2 cuts,
+  including a staggered one, which GF180MCU MT30.8 (30K) rejects. The fixtures no longer draw
+  one, but a design could; tightening the generic rule to "a rectangular array" (outcome (a))
+  changes the generic deck and the Task 14 fail fixtures and is left for a decision.
+- `layergen` limitation (recorded in `tests/layergen/test_derive.py`): an nd bar of width
+  `df.w` butted to pd on both long sides gets an nsel only `df.w` wide (below `nsel.w`); no
+  pass fixture draws it.
+
+## Tally
+
+First run (2026-11-07, 151 pass fixtures, before any decision): 9K 139 clean / 12 dirty,
+11K 139 / 12, 30K 134 / 17 (PP.1, NP.5b on the 8 butted fixtures; DN.3 on the 4 dnw
+fixtures; MT30.8 on 5 v4 fixtures at 30K only).

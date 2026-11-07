@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: Apache-2.0
+[project]
+name = "ws180g"
+version = "0.0.0"
+description = "wafer.space 180 nm generic PDK: workspace root"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+
+[tool.uv.workspace]
+members = ["process", "evidence", "rules", "layergen", "tech", "precheck", "build"]
+
+[tool.uv.sources]
+ws180g-process = { workspace = true }
+ws180g-evidence = { workspace = true }
+ws180g-rules = { workspace = true }
+ws180g-layergen = { workspace = true }
+ws180g-tech = { workspace = true }
+ws180g-precheck = { workspace = true }
+ws180g-build = { workspace = true }
+
+[dependency-groups]
+dev = ["pytest>=9", "ruff", "pydantic>=2.11", "klayout>=0.30.12"]
+docs = ["sphinx", "myst-parser", "furo"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers"
+markers = [
+    "sandbox: runs a tool in the container through build/sandbox-run (needs Docker)",
+    "slow: minutes, not seconds",
+]
+
+[tool.ruff]
+line-length = 100

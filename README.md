@@ -10,3 +10,13 @@ Start with the design document:
 
 Everything in this repository comes from public sources, each cited; nothing here is under a
 non-disclosure agreement. Licence: Apache-2.0 (see [`LICENSE`](LICENSE)).
+
+## Development
+
+```
+git clone git@github.com:wafer-space-robot/ws180g-pdk.git
+cd ws180g-pdk
+uv sync --all-packages
+uv run pytest -rs -v
+uv run ruff check .
+```

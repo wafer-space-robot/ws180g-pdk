@@ -1,6 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 from decimal import Decimal
 
+import pytest
+from pydantic import ValidationError
+from ws180g_process.model import Layer
+
 EXPECTED_GDS = {"nw": (1, 0), "nd": (2, 0), "pd": (3, 0), "po": (4, 0), "co": (5, 0),
                 "m1": (11, 0), "v1": (12, 0), "m2": (13, 0), "v2": (14, 0), "m3": (15, 0),
                 "v3": (16, 0), "m4": (17, 0), "v4": (18, 0), "mtop": (19, 0), "pad": (20, 0),
@@ -27,3 +31,14 @@ def test_layer_numbers_are_frozen(process):  # golden test: the ws180g005 number
 
 def test_every_layer_has_a_purpose(process):
     assert all(layer.purpose for layer in process.layers.values())
+
+
+@pytest.mark.parametrize("gds", [(1.0, 0), ("1", 0), (True, 0), (-1, 0), (65536, 0), (1, 70000)])
+def test_gds_numbers_are_strict_ints_in_range(gds):
+    with pytest.raises(ValidationError):
+        Layer(gds=gds, kind="drawn", variant="ws180g005", purpose="x")
+
+
+def test_gds_accepts_the_largest_numbers():
+    assert Layer(gds=[65535, 65535], kind="drawn", variant="ws180g005", purpose="x").gds == (
+        65535, 65535)

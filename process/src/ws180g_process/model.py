@@ -2,7 +2,7 @@
 """Typed model of the process description. The TOML files are the only source of numbers."""
 
 from decimal import Decimal
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, model_validator
 from pydantic import Field as PydanticField
@@ -10,6 +10,9 @@ from pydantic import Field as PydanticField
 from ws180g_process.ranges import Range
 
 Provenance = Literal["design-target", "public-source", "chosen", "derived"]
+
+# A GDS layer or datatype number: a 16-bit unsigned int, never a float, string or bool.
+GdsNumber = Annotated[int, PydanticField(strict=True, ge=0, le=65535)]
 
 
 class Strict(BaseModel):
@@ -46,7 +49,7 @@ class Variant(Strict):
 class Layer(Strict):
     """A GDS layer. Exactly one of `variant` (where it first appears) or `module` is set."""
 
-    gds: tuple[int, int]
+    gds: tuple[GdsNumber, GdsNumber]
     kind: Literal["drawn", "generated"]
     variant: str | None = None
     module: str | None = None

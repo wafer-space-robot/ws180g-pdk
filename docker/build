@@ -10,11 +10,16 @@
 # goes to stderr.
 #
 # docker/IMAGE holds the reference build/sandbox-run runs: ws180g-pdk-base:local for now. Once a
-# push exists it becomes ghcr.io/wafer-space-robot/ws180g-pdk-base@sha256:<registry digest>.
+# push exists it becomes ghcr.io/wafer-space-robot/ws180g-pdk-base@sha256:<manifest digest>, the
+# manifest digest the registry reports for the push (not IMAGE_ID, which is the config digest;
+# build/sandbox-run checks the local image's ID against IMAGE_ID either way).
 #
-# Reproducibility: a pinned BuildKit (docker-container driver), SOURCE_DATE_EPOCH = commit time of
-# the last change to the build inputs (so committing IMAGE_ID/IMAGE/versions.json does not change
-# it), rewrite-timestamp=true, no provenance/SBOM attestations, single platform.
+# Reproducibility: a pinned BuildKit (docker-container driver), SOURCE_DATE_EPOCH = author time
+# (%at) of the last commit touching the build inputs (author time survives a rebase, committer
+# time does not; committing IMAGE_ID/IMAGE/versions.json does not change it), rewrite-timestamp=
+# true, no provenance/SBOM attestations, single platform. Any change to the inputs or to their
+# last commit's author time changes the digest: rebuild and commit the new docker/IMAGE_ID (and
+# regenerate docker/versions.json) after it.
 set -euo pipefail
 
 BUILDKIT_IMAGE="moby/buildkit:v0.34.0@sha256:b059f8d7226d0b326bc871af489a5dddf65e36af4d20d14251b072974d9ee87c"
@@ -54,7 +59,7 @@ if [ -n "$(git -C "$REPO" status --porcelain -- "${INPUTS[@]}")" ]; then
     echo "build: uncommitted changes in ${INPUTS[*]}; commit them first" >&2
     exit 2
 fi
-SOURCE_DATE_EPOCH="$(git -C "$REPO" log -1 --format=%ct -- "${INPUTS[@]}")"
+SOURCE_DATE_EPOCH="$(git -C "$REPO" log -1 --format=%at -- "${INPUTS[@]}")"
 [ -n "$SOURCE_DATE_EPOCH" ] || { echo "build: cannot date ${INPUTS[*]} (shallow clone?)" >&2; exit 2; }
 export SOURCE_DATE_EPOCH
 echo "build: SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" >&2

@@ -1,4 +1,5 @@
 ws180g-pdk-base:local
-# Line 1 is the image build/sandbox-run uses. It becomes
-# ghcr.io/wafer-space-robot/ws180g-pdk-base@sha256:<IMAGE_ID digest> once docker/build --push has
-# published the image; until then it is the local tag that docker/build loads.
+# Line 1 is the image build/sandbox-run uses: the local tag docker/build loads. Once
+# docker/build --push has published the image it becomes
+# ghcr.io/wafer-space-robot/ws180g-pdk-base@sha256:<manifest digest>, the manifest digest the
+# registry reports for that push (not docker/IMAGE_ID, which is the image config digest).

@@ -60,3 +60,9 @@ allow it), with `--mem` as both the memory and the memory+swap limit; its exit c
 root, the git directories, and any directory inside the repository other than `tmp/`. The tests
 that need the image are marked `sandbox` (`uv run pytest -rs -v -m "sandbox and not slow"`); the
 `slow` one rebuilds the image and checks the digest.
+
+`docker/IMAGE`, `docker/IMAGE_ID`, `docker/versions.json` and `docker/requirements.lock` carry no
+SPDX line: they are generated or data files (JSON and the uv export cannot hold one cleanly).
+`IMAGE_ID` must be regenerated (run `docker/build`, commit the digest it prints) after any change
+to `docker/Dockerfile` or `docker/requirements.lock`, or to the author time of the last commit
+touching them; `build/sandbox-run` refuses to run an image whose ID differs.

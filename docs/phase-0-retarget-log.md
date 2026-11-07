@@ -18,8 +18,8 @@ Each GF violation on a pass fixture ends in exactly one of:
 - **(b)** the fixture's clean context or `layergen` is corrected, because the fixture, not the
   rule set, was wrong;
 - **(c)** the fixture is excluded from gate check 2, with the GF rule and the reason recorded
-  here and in `EXCLUDED` of the test (expected only for the `dnw` module fixtures, whose ring
-  topology is the module's open item).
+  here and in `ws180g_precheck.gate.EXCLUDED` (expected only for the `dnw` module fixtures,
+  whose ring topology is the module's open item).
 
 Every (a) and (b) adds the failing case to `tests/precheck/regressions/` as a permanent
 fixture: a Python module that regenerates the layout (spec 9.3). A GF violation from a rule

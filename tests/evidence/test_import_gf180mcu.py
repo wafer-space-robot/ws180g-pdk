@@ -14,7 +14,7 @@ def test_entry_ids_and_columns(gf_entries):
     assert gf_entries["gf180mcu-drm/PL.2/5v/p"].value == Decimal("0.5")
     assert gf_entries["gf180mcu-drm/Mn.1/m1"].value == Decimal("0.23")
     assert gf_entries["gf180mcu-drm/Mn.1/mn"].value == Decimal("0.28")
-    assert gf_entries["gf180mcu-drm/DF.13/5v"].kind == "max-distance" and gf_entries["gf180mcu-drm/DF.13/5v"].value == Decimal("15")
+    assert gf_entries["gf180mcu-drm/DF.13/5v"].kind == "max-distance" and gf_entries["gf180mcu-drm/DF.13/5v"].value == Decimal(15)
     assert gf_entries["gf180mcu-drm/DF.9/5v"].unit == "um2"
     assert gf_entries["gf180mcu-drm/MT30.1/a"].value == Decimal("1.8") and gf_entries["gf180mcu-drm/MT30.1/b"].value == Decimal("2.2")
     assert gf_entries["gf180mcu-drm/PL.3b/5v"].guideline is True        # trailing * in the rule number
@@ -23,12 +23,12 @@ def test_entry_ids_and_columns(gf_entries):
     assert "gf180mcu-drm/PL.6" not in gf_entries                        # text-only rule
     assert gf_entries["gf180mcu-drm/PL.10/5v"].unit == "mA/um"
     assert gf_entries["gf180mcu-drm/GRID"].kind == "grid" and gf_entries["gf180mcu-drm/GRID"].value == Decimal("0.005")
-    assert gf_entries["gf180mcu-drm/PL.8/5v"].kind == "density-floor" and gf_entries["gf180mcu-drm/PL.8/5v"].value == Decimal("14")
+    assert gf_entries["gf180mcu-drm/PL.8/5v"].kind == "density-floor" and gf_entries["gf180mcu-drm/PL.8/5v"].value == Decimal(14)
     assert gf_entries["gf180mcu-drm/DF.2b/5v"].kind == "max-width"
     assert gf_entries["gf180mcu-drm/NP.3d"].kind == "min-space"
     assert gf_entries["gf180mcu-drm/MT.1/b"].guideline is True and gf_entries["gf180mcu-drm/MT.1/b"].value == Decimal("0.44")
     assert gf_entries["gf180mcu-drm/TM30K"].kind == "thickness" and gf_entries["gf180mcu-drm/TM30K"].value == Decimal("3.0")
-    assert gf_entries["gf180mcu-drm/LU.1/mv/a"].kind == "max-distance" and gf_entries["gf180mcu-drm/LU.1/mv/a"].value == Decimal("15")
+    assert gf_entries["gf180mcu-drm/LU.1/mv/a"].kind == "max-distance" and gf_entries["gf180mcu-drm/LU.1/mv/a"].value == Decimal(15)
 
 
 def test_golden_poly_table(repo_root, tmp):

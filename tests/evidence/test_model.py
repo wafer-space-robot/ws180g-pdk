@@ -27,7 +27,8 @@ def test_registered_source_loads(tmp):
 
 def test_every_error_reported_at_once(tmp):
     bad = evidence_dir_with(
-        [{"id": "foo/X.1", "source": "foo", "kind": "nonsense", "value": 1},
+        [{"id": "foo/X.1", "source": "foo", "kind": "min-width", "value": 1},
+         {"id": "foo/X.3", "source": "foo", "kind": "nonsense", "value": 1},
          {"id": "bar/X.2", "source": "bar", "kind": "min-width", "value": 1},
          {"id": "foo/X.1", "source": "foo", "kind": "min-width", "value": 1}],
         sources={"foo": SOURCE})

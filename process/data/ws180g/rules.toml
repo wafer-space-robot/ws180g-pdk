@@ -1,3 +1,1172 @@
 # SPDX-License-Identifier: Apache-2.0
-# Filled in Task 7.
-[rules]
+# The Phase 0 rule set of ws180g005 (plan, shared vocabulary). Lengths in um, areas in
+# um2. Each value is the public envelope with a margin (spec 3.6): at least 1.2 x the
+# largest binding public minimum, rounded up to the 0.005 um grid (area: up to a
+# multiple of 0.005 um2); 1.5 x when every binding entry cited comes from one source
+# (this plan's provisional single-source rule); a maximum is the smallest public maximum
+# divided by 1.25, or by 1.5 for a single source, rounded down. Cut sizes are exact
+# (spec 3.3). `margin_achieved` = value / largest binding cited minimum (smallest
+# maximum / value), rounded half-up to 0.001; guideline entries are cited but never
+# bind. `layers` are layer expressions over the layer names and the aliases below.
+
+[aliases]
+df = "nd|pd"
+field_po = "po-(df.sized(rules.po.x.df))"
+
+# --- n-well
+
+[rules."nw.w"]
+kind = "min-width"
+layers = ["nw"]
+value = 1.44
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/NW.1a/5v", "xc018/nwell/width", "scmos8/1.1/deep", "scmos8/1.1/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF NW.1a 0.86; XC 0.86; S8 1.1 12 lambda 1.08/1.20; 1.2 x 1.20"
+
+[rules."nw.s"]
+kind = "min-space"
+layers = ["nw"]
+value = 2.16
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/NW.2b/5v", "gf180mcu-drm/NW.2a/5v", "xc018/nwell/spacing", "scmos8/1.2/deep", "scmos8/1.2/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF NW.2b 1.7 (NW.2a 0.74 equipotential); XC 1.4; S8 1.2 18 lambda 1.62/1.80; 1.2 x 1.80"
+
+[rules."nw.e.pd"]
+kind = "min-enclosure"
+layers = ["nw", "pd"]
+value = 0.72
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/DF.4c/5v", "scmos8/2.3/deep", "scmos8/2.3/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF DF.4c 0.60; S8 2.3 6 lambda 0.54/0.60; 1.2 x 0.60"
+
+[rules."nw.e.nd"]
+kind = "min-enclosure"
+layers = ["nw", "nd"]
+value = 0.36
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/DF.4d/5v", "scmos8/2.4/deep", "scmos8/2.4/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF DF.4d 0.16; S8 2.4 3 lambda 0.27/0.30; 1.2 x 0.30"
+
+[rules."nw.s.nd"]
+kind = "min-space"
+layers = ["nw", "nd"]
+value = 0.72
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/DF.16/5v", "scmos8/2.3/deep", "scmos8/2.3/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF DF.16 0.60; S8 2.3 0.54/0.60; 1.2 x 0.60"
+
+[rules."nw.s.pd"]
+kind = "min-space"
+layers = ["nw", "pd"]
+value = 0.36
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/DF.17/5v", "scmos8/2.4/deep", "scmos8/2.4/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF DF.17 0.16; S8 2.4 0.27/0.30; 1.2 x 0.30"
+
+[rules."nw.tap.dmax"]
+kind = "max-distance"
+layers = ["pd&nw", "ntap"]
+value = 10
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/DF.13/5v"]
+margin = 1.5
+margin_achieved = 1.500
+engines = ["klayout"]
+note = "GF DF.13 15 / 1.5 (single source: margin 1.5, divided)"
+
+[rules."ps.tap.dmax"]
+kind = "max-distance"
+layers = ["nd-nw", "ptap"]
+value = 10
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/DF.14/5v"]
+margin = 1.5
+margin_achieved = 1.500
+engines = ["klayout"]
+note = "GF DF.14 15 / 1.5 (single source: margin 1.5, divided)"
+
+# --- diffusion
+
+[rules."df.w"]
+kind = "min-width"
+layers = ["df"]
+value = 0.36
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/DF.1a/5v", "gf180mcu-drm/DF.2a/5v", "xc018/active/width", "scmos8/2.1/deep", "scmos8/2.1/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF DF.1a 0.30, DF.2a 0.30; XC 0.22; S8 2.1 3 lambda 0.27/0.30; 1.2 x 0.30"
+
+[rules."df.s"]
+kind = "min-space"
+layers = ["df"]
+value = 0.435
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/DF.3a/5v", "xc018/active/spacing", "scmos8/2.2/deep", "scmos8/2.2/subm"]
+margin = 1.2
+margin_achieved = 1.208
+engines = ["klayout", "magic"]
+note = "GF DF.3a 0.36; XC 0.28; S8 2.2 3 lambda 0.27/0.30; 1.2 x 0.36 = 0.432, up to 0.435"
+
+[rules."df.s.np"]
+kind = "min-space"
+layers = ["nd", "pd"]
+value = 0.48
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/DF.3a/5v", "gf180mcu-drm/DF.3b/5v", "scmos8/2.5/deep", "scmos8/2.5/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "butting allowed; GF DF.3a 0.36, DF.3b 0 butted; S8 2.5 4 lambda 0.36/0.40; 1.2 x 0.40"
+
+[rules."df.x.po"]
+kind = "min-extension"
+layers = ["df", "gate"]
+value = 0.48
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/DF.6/5v", "scmos8/3.4/deep", "scmos8/3.4/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF DF.6 0.40; S8 3.4 4 lambda 0.36 / 3 lambda 0.30; 1.2 x 0.40"
+
+[rules."df.e.co"]
+kind = "min-enclosure"
+layers = ["df", "co"]
+value = 0.18
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/CO.4", "scmos8/6.2/deep", "scmos8/6.2/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF CO.4 0.07; S8 6.2 1.5 lambda 0.135/0.15; 1.2 x 0.15"
+
+[rules."df.area"]
+kind = "min-area"
+layers = ["df"]
+value = 0.305
+unit = "um2"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/DF.9/5v"]
+margin = 1.5
+margin_achieved = 1.506
+engines = ["klayout", "magic"]
+note = "GF DF.9 0.2025 um2 x 1.5 (single source) = 0.30375, up to 0.305"
+
+[rules."nd.s.pgate"]
+kind = "min-space"
+layers = ["nd", "(gate&nw)|(po&((gate&nw).sized(rules.po.x.df)))"]
+value = 0.665
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/NP.4a", "gf180mcu-drm/NP.4b", "scmos8/4.1/deep", "scmos8/4.1/subm"]
+margin = 1.2
+margin_achieved = 1.203
+composed_of = ["gf180mcu-drm/NP.4a", "gf180mcu-drm/NP.4b", "scmos8/4.1/deep", "scmos8/4.1/subm", "rules.sel.x"]
+engines = ["klayout", "magic"]
+note = "nd to the p-channel gate and its end-cap poly; 1.2 x max(GF NP.4a 0.32, NP.4b 0.22, S8 4.1 3 lambda 0.27/0.30) = 0.384, up to 0.385, plus rules.sel.x 0.28"
+
+[rules."pd.s.ngate"]
+kind = "min-space"
+layers = ["pd", "(gate-nw)|(po&((gate-nw).sized(rules.po.x.df)))"]
+value = 0.665
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/PP.4a", "gf180mcu-drm/PP.4b", "scmos8/4.1/deep", "scmos8/4.1/subm"]
+margin = 1.2
+margin_achieved = 1.203
+composed_of = ["gf180mcu-drm/PP.4a", "gf180mcu-drm/PP.4b", "scmos8/4.1/deep", "scmos8/4.1/subm", "rules.sel.x"]
+engines = ["klayout", "magic"]
+note = "pd to the n-channel gate and its end-cap poly; 1.2 x max(GF PP.4a 0.32, PP.4b 0.22, S8 4.1 3 lambda 0.27/0.30) = 0.384, up to 0.385, plus rules.sel.x 0.28"
+
+# --- poly
+
+[rules."po.w"]
+kind = "min-width"
+layers = ["po"]
+value = 0.24
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/PL.1/5v", "xc018/poly/width", "scmos8/3.1/deep", "scmos8/3.1/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF PL.1 0.20; XC 0.18; S8 3.1 2 lambda 0.18/0.20; 1.2 x 0.20"
+
+[rules."po.l.n"]
+kind = "gate-length"
+layers = ["gate-nw"]
+value = 0.72
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/PL.2/5v/n", "scmos8/24.5/deep", "scmos8/24.5/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF PL.2 0.60 (n); S8 24.5 3 lambda 0.27/0.30; 1.2 x 0.60. The n/p order of the GF cell \"0.6/0.5\" follows the public model card: nfet_06v0 lmin of bin 0 is 0.7 um, the first value of the 6 V cell, and pfet_06v0 lmin is 0.5 um, the second value of the 5 V cell; the card's 6 V lmin is not cited as evidence, 6 V being out of scope"
+
+[rules."po.l.p"]
+kind = "gate-length"
+layers = ["gate&nw"]
+value = 0.60
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/PL.2/5v/p", "scmos8/24.5/deep", "scmos8/24.5/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF PL.2 0.50 (p, second value of the cell; see po.l.n); S8 24.5 3 lambda 0.27/0.30; 1.2 x 0.50"
+
+[rules."po.s"]
+kind = "min-space"
+layers = ["po"]
+value = 0.435
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/PL.3a/5v/a", "gf180mcu-drm/PL.3a/5v/b", "gf180mcu-drm/PL.3b/5v", "xc018/poly/spacing", "scmos8/3.2.a/deep", "scmos8/3.2.a/subm", "scmos8/3.2/deep", "scmos8/3.2/subm"]
+margin = 1.2
+margin_achieved = 1.208
+engines = ["klayout", "magic"]
+note = "GF PL.3a 0.24 (PL.3b 0.4 guideline, informative); XC 0.25; S8 3.2.a 4 lambda 0.36 (3.2 3 lambda 0.27/0.30); 1.2 x 0.36 = 0.432, up to 0.435"
+
+[rules."po.x.df"]
+kind = "min-extension"
+layers = ["po", "gate"]
+value = 0.27
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/PL.4/5v", "scmos8/3.3/deep", "scmos8/3.3/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "end cap; GF PL.4 0.22; S8 3.3 2.5 lambda 0.225 / 2 lambda 0.20; 1.2 x 0.225"
+
+[rules."po.s.df"]
+kind = "min-space"
+layers = ["field_po", "df"]
+value = 0.36
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/PL.5a/5v", "gf180mcu-drm/PL.5b/5v", "scmos8/3.5/deep", "scmos8/3.5/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF PL.5a 0.30, PL.5b 0.30; S8 3.5 1 lambda 0.09/0.10; 1.2 x 0.30"
+
+[rules."po.e.co"]
+kind = "min-enclosure"
+layers = ["po", "co"]
+value = 0.18
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/CO.3", "scmos8/5.2/deep", "scmos8/5.2/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF CO.3 0.07; S8 5.2 1.5 lambda 0.135/0.15; 1.2 x 0.15"
+
+# --- contact
+
+[rules."co.size"]
+kind = "exact-size"
+layers = ["co"]
+value = 0.22
+unit = "um"
+variant = "ws180g005"
+provenance = "public-source"
+evidence = ["gf180mcu-drm/CO.1", "xc018/contact/width", "scmos8/5.1/deep", "scmos8/5.1/subm"]
+engines = ["klayout", "magic"]
+note = "exact (cut sizes are exempt from the margin, spec 3.3): GF CO.1 0.22; XC 0.22; S8 5.1 2 lambda 0.18/0.20; the largest public exact size"
+
+[rules."co.s"]
+kind = "min-space"
+layers = ["co"]
+value = 0.435
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/CO.2a", "gf180mcu-drm/CO.2b", "xc018/contact/spacing", "scmos8/5.3/deep", "scmos8/5.3/subm"]
+margin = 1.2
+margin_achieved = 1.208
+engines = ["klayout", "magic"]
+note = "GF CO.2a 0.25, CO.2b 0.28; XC 0.25; S8 5.3 4 lambda 0.36 / 3 lambda 0.30; 1.2 x 0.36 = 0.432, up to 0.435"
+
+[rules."co.s.gate"]
+kind = "min-space"
+layers = ["co", "gate"]
+value = 0.24
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/CO.7", "scmos8/5.4/deep", "scmos8/5.4/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF CO.7 0.15; S8 5.4 2 lambda 0.18/0.20; 1.2 x 0.20"
+
+[rules."co.po.s.df"]
+kind = "min-space"
+layers = ["co&po", "df"]
+value = 0.24
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/CO.8", "scmos8/5.6.b/deep", "scmos8/5.6.b/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF CO.8 0.17; S8 5.6.b 2 lambda 0.18/0.20 (from the SCMOS alternative contact rule set); 1.2 x 0.20"
+
+[rules."co.s.butt"]
+kind = "min-space"
+layers = ["co", "nd", "pd"]
+value = 0.165
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/CO.5a", "gf180mcu-drm/CO.5b", "scmos8/4.3/deep", "scmos8/4.3/subm"]
+margin = 1.2
+margin_achieved = 1.222
+fixture = "co_s_butt"
+engines = ["klayout"]
+note = "space from co to the nd/pd butting edge; GF CO.5a/CO.5b 0.1; S8 4.3 select overlap of contact 1.5 lambda 0.135 / 1 lambda 0.10 (the selects meet at the butting edge); 1.2 x 0.135 = 0.162, up to 0.165"
+
+[rules."co.in"]
+kind = "topology"
+layers = ["co", "po|df"]
+variant = "ws180g005"
+provenance = "public-source"
+evidence = ["gf180mcu-drm/CO.3", "gf180mcu-drm/CO.4", "scmos8/5.2/deep", "scmos8/5.2/subm", "scmos8/6.2/deep", "scmos8/6.2/subm"]
+fixture = "co_on_field"
+engines = ["klayout", "magic"]
+note = "co lies inside po or df: GF180MCU CO.11 \"Contact on field oxide is forbidden.\" (21_Contact_56.csv; no value, so no evidence entry); the cited poly and diffusion overlaps of contact (GF CO.3, CO.4; S8 sections 5, 6: 5.2, 6.2) imply it"
+
+[rules."co.no.gate"]
+kind = "topology"
+layers = ["co", "gate"]
+variant = "ws180g005"
+provenance = "public-source"
+evidence = []
+fixture = "co_on_gate"
+engines = ["klayout", "magic"]
+note = "co never overlaps gate: GF180MCU CO.10 \"Contact on Poly2 gate over COMP is forbidden.\" (21_Contact_56.csv, row CO.10; a rule without a value, so the importer records no evidence entry)"
+
+[rules."co.no.butt"]
+kind = "topology"
+layers = ["co", "nd", "pd"]
+variant = "ws180g005"
+provenance = "public-source"
+evidence = []
+fixture = "co_on_butt"
+engines = ["klayout", "magic"]
+note = "co never straddles an nd/pd butting edge: GF180MCU CO.9 \"Contact on NCOMP to PCOMP butting edge is forbidden (contact must not straddle butting edge)\" (21_Contact_56.csv, row CO.9; no value, so no evidence entry)"
+
+# --- metal 1 and via 1
+
+[rules."m1.w"]
+kind = "min-width"
+layers = ["m1"]
+value = 0.36
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/Mn.1/m1", "xc018/metal1/width", "scmos8/7.1/deep", "scmos8/7.1/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF Mn.1 0.23; XC 0.23; S8 7.1 3 lambda 0.27/0.30; 1.2 x 0.30"
+
+[rules."m1.s"]
+kind = "min-space"
+layers = ["m1"]
+value = 0.36
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/Mn.2a/m1", "gf180mcu-drm/Mn.2b", "xc018/metal1/spacing", "scmos8/7.2/deep", "scmos8/7.2/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF Mn.2a 0.23, Mn.2b 0.30; XC 0.23; S8 7.2 3 lambda 0.27/0.30; 1.2 x 0.30"
+
+[rules."m1.e.co"]
+kind = "min-enclosure"
+layers = ["m1", "co"]
+value = 0.12
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/CO.6/a", "gf180mcu-drm/CO.6/b", "gf180mcu-drm/CO.6/c", "scmos8/7.3/deep", "scmos8/7.3/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF CO.6 0.06 (parts 0.005, 0.06, 0.06; the cell's last value 0.12 is the all-sides guideline (part iii, marked *) and is not cited); S8 7.3 1 lambda 0.09/0.10; 1.2 x 0.10"
+
+[rules."m1.e.v1"]
+kind = "min-enclosure"
+layers = ["m1", "v1"]
+value = 0.12
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/Vn.3/a", "gf180mcu-drm/Vn.3/c", "gf180mcu-drm/Vn.3/d", "scmos8/8.3/deep", "scmos8/8.3/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF Vn.3 0.06 (n = 1: parts 0.00, 0.06, 0.06; the cell's last value 0.12 is the all-sides guideline (part iii, marked *) and is not cited); S8 8.3 1 lambda 0.09/0.10; 1.2 x 0.10"
+
+[rules."m1.area"]
+kind = "min-area"
+layers = ["m1"]
+value = 0.22
+unit = "um2"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/Mn.3"]
+margin = 1.5
+margin_achieved = 1.524
+engines = ["klayout", "magic"]
+note = "GF Mn.3 0.1444 um2 x 1.5 (single source) = 0.2166, up to 0.22"
+
+[rules."v1.size"]
+kind = "exact-size"
+layers = ["v1"]
+value = 0.27
+unit = "um"
+variant = "ws180g005"
+provenance = "public-source"
+evidence = ["gf180mcu-drm/Vn.1", "xc018/via/width", "scmos8/8.1/deep", "scmos8/8.1/subm"]
+engines = ["klayout", "magic"]
+note = "exact (spec 3.3): GF Vn.1 0.26; XC 0.26; S8 8.1 3 lambda 0.27 / 2 lambda 0.20; the largest public exact size"
+
+[rules."v1.s"]
+kind = "min-space"
+layers = ["v1"]
+value = 0.435
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/Vn.2a", "gf180mcu-drm/Vn.2b", "xc018/via/spacing", "scmos8/8.2/deep", "scmos8/8.2/subm"]
+margin = 1.2
+margin_achieved = 1.208
+engines = ["klayout", "magic"]
+note = "GF Vn.2a 0.26, Vn.2b 0.36; XC 0.26; S8 8.2 3 lambda 0.27/0.30; 1.2 x 0.36 = 0.432, up to 0.435"
+
+# --- metal 2 and via 2
+
+[rules."m2.w"]
+kind = "min-width"
+layers = ["m2"]
+value = 0.36
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/Mn.1/mn", "xc018/metal2345/width", "scmos8/9.1/deep", "scmos8/9.1/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF Mn.1 0.28; XC 0.28; S8 9.1 3 lambda 0.27/0.30; 1.2 x 0.30"
+
+[rules."m2.s"]
+kind = "min-space"
+layers = ["m2"]
+value = 0.435
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/Mn.2a/mn", "gf180mcu-drm/Mn.2b", "xc018/metal2345/spacing", "scmos8/9.2/deep", "scmos8/9.2/subm"]
+margin = 1.2
+margin_achieved = 1.208
+engines = ["klayout", "magic"]
+note = "GF Mn.2a 0.28, Mn.2b 0.30; XC 0.28; S8 9.2 4 lambda 0.36 / 3 lambda 0.30; 1.2 x 0.36 = 0.432, up to 0.435"
+
+[rules."m2.e.v1"]
+kind = "min-enclosure"
+layers = ["m2", "v1"]
+value = 0.12
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/Vn.4/a", "gf180mcu-drm/Vn.4/b", "gf180mcu-drm/Vn.4/c", "scmos8/9.3/deep", "scmos8/9.3/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF Vn.4 0.06 (parts 0.01, 0.06, 0.06; the cell's last value 0.12 is the all-sides guideline (part iii, marked *) and is not cited); S8 9.3 1 lambda 0.09/0.10; 1.2 x 0.10"
+
+[rules."m2.e.v2"]
+kind = "min-enclosure"
+layers = ["m2", "v2"]
+value = 0.12
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/Vn.3/b", "gf180mcu-drm/Vn.3/c", "gf180mcu-drm/Vn.3/d", "scmos8/14.3/deep", "scmos8/14.3/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF Vn.3 0.06 (2 <= n <= 5: parts 0.01, 0.06, 0.06; the cell's last value 0.12 is the all-sides guideline (part iii, marked *) and is not cited); S8 14.3 1 lambda 0.09/0.10; 1.2 x 0.10"
+
+[rules."m2.area"]
+kind = "min-area"
+layers = ["m2"]
+value = 0.22
+unit = "um2"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/Mn.3"]
+margin = 1.5
+margin_achieved = 1.524
+engines = ["klayout", "magic"]
+note = "GF Mn.3 0.1444 um2 x 1.5 (single source) = 0.2166, up to 0.22"
+
+[rules."v2.size"]
+kind = "exact-size"
+layers = ["v2"]
+value = 0.27
+unit = "um"
+variant = "ws180g005"
+provenance = "public-source"
+evidence = ["gf180mcu-drm/Vn.1", "xc018/via/width", "scmos8/14.1/deep", "scmos8/14.1/subm"]
+engines = ["klayout", "magic"]
+note = "exact (spec 3.3): GF Vn.1 0.26; XC 0.26; S8 14.1 3 lambda 0.27 / 2 lambda 0.20; the largest public exact size"
+
+[rules."v2.s"]
+kind = "min-space"
+layers = ["v2"]
+value = 0.435
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/Vn.2a", "gf180mcu-drm/Vn.2b", "xc018/via/spacing", "scmos8/14.2/deep", "scmos8/14.2/subm"]
+margin = 1.2
+margin_achieved = 1.208
+engines = ["klayout", "magic"]
+note = "GF Vn.2a 0.26, Vn.2b 0.36; XC 0.26; S8 14.2 3 lambda 0.27/0.30; 1.2 x 0.36 = 0.432, up to 0.435"
+
+# --- metal 3 and via 3
+
+[rules."m3.w"]
+kind = "min-width"
+layers = ["m3"]
+value = 0.36
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/Mn.1/mn", "xc018/metal2345/width", "scmos8/15.1/deep", "scmos8/15.1/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF Mn.1 0.28; XC 0.28; S8 15.1 3 lambda 0.27/0.30; 1.2 x 0.30"
+
+[rules."m3.s"]
+kind = "min-space"
+layers = ["m3"]
+value = 0.435
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/Mn.2a/mn", "gf180mcu-drm/Mn.2b", "xc018/metal2345/spacing", "scmos8/15.2/deep", "scmos8/15.2/subm"]
+margin = 1.2
+margin_achieved = 1.208
+engines = ["klayout", "magic"]
+note = "GF Mn.2a 0.28, Mn.2b 0.30; XC 0.28; S8 15.2 4 lambda 0.36 / 3 lambda 0.30; 1.2 x 0.36 = 0.432, up to 0.435"
+
+[rules."m3.e.v2"]
+kind = "min-enclosure"
+layers = ["m3", "v2"]
+value = 0.12
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/Vn.4/a", "gf180mcu-drm/Vn.4/b", "gf180mcu-drm/Vn.4/c", "scmos8/15.3/deep", "scmos8/15.3/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF Vn.4 0.06 (parts 0.01, 0.06, 0.06; the cell's last value 0.12 is the all-sides guideline (part iii, marked *) and is not cited); S8 15.3 1 lambda 0.09/0.10; 1.2 x 0.10"
+
+[rules."m3.e.v3"]
+kind = "min-enclosure"
+layers = ["m3", "v3"]
+value = 0.12
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/Vn.3/b", "gf180mcu-drm/Vn.3/c", "gf180mcu-drm/Vn.3/d", "scmos8/21.3/deep", "scmos8/21.3/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF Vn.3 0.06 (2 <= n <= 5: parts 0.01, 0.06, 0.06; the cell's last value 0.12 is the all-sides guideline (part iii, marked *) and is not cited); S8 21.3 1 lambda 0.09/0.10; 1.2 x 0.10"
+
+[rules."m3.area"]
+kind = "min-area"
+layers = ["m3"]
+value = 0.22
+unit = "um2"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/Mn.3"]
+margin = 1.5
+margin_achieved = 1.524
+engines = ["klayout", "magic"]
+note = "GF Mn.3 0.1444 um2 x 1.5 (single source) = 0.2166, up to 0.22"
+
+[rules."v3.size"]
+kind = "exact-size"
+layers = ["v3"]
+value = 0.27
+unit = "um"
+variant = "ws180g005"
+provenance = "public-source"
+evidence = ["gf180mcu-drm/Vn.1", "xc018/via/width", "scmos8/21.1/deep", "scmos8/21.1/subm"]
+engines = ["klayout", "magic"]
+note = "exact (spec 3.3): GF Vn.1 0.26; XC 0.26; S8 21.1 3 lambda 0.27 / 2 lambda 0.20; the largest public exact size"
+
+[rules."v3.s"]
+kind = "min-space"
+layers = ["v3"]
+value = 0.435
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/Vn.2a", "gf180mcu-drm/Vn.2b", "xc018/via/spacing", "scmos8/21.2/deep", "scmos8/21.2/subm"]
+margin = 1.2
+margin_achieved = 1.208
+engines = ["klayout", "magic"]
+note = "GF Vn.2a 0.26, Vn.2b 0.36; XC 0.26; S8 21.2 3 lambda 0.27/0.30; 1.2 x 0.36 = 0.432, up to 0.435"
+
+# --- metal 4
+
+[rules."m4.w"]
+kind = "min-width"
+layers = ["m4"]
+value = 0.36
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/Mn.1/mn", "xc018/metal2345/width", "scmos8/22.1/deep", "scmos8/22.1/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF Mn.1 0.28; XC 0.28; S8 22.1 3 lambda 0.27/0.30; 1.2 x 0.30"
+
+[rules."m4.s"]
+kind = "min-space"
+layers = ["m4"]
+value = 0.435
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/Mn.2a/mn", "gf180mcu-drm/Mn.2b", "xc018/metal2345/spacing", "scmos8/22.2/deep", "scmos8/22.2/subm"]
+margin = 1.2
+margin_achieved = 1.208
+engines = ["klayout", "magic"]
+note = "GF Mn.2a 0.28, Mn.2b 0.30; XC 0.28; S8 22.2 4 lambda 0.36 / 3 lambda 0.30; 1.2 x 0.36 = 0.432, up to 0.435"
+
+[rules."m4.e.v3"]
+kind = "min-enclosure"
+layers = ["m4", "v3"]
+value = 0.12
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/Vn.4/a", "gf180mcu-drm/Vn.4/b", "gf180mcu-drm/Vn.4/c", "scmos8/22.3/deep", "scmos8/22.3/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF Vn.4 0.06 (parts 0.01, 0.06, 0.06; the cell's last value 0.12 is the all-sides guideline (part iii, marked *) and is not cited); S8 22.3 1 lambda 0.09/0.10; 1.2 x 0.10"
+
+[rules."m4.e.v4"]
+kind = "min-enclosure"
+layers = ["m4", "v4"]
+value = 0.12
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/Vn.3/b", "gf180mcu-drm/Vn.3/c", "gf180mcu-drm/Vn.3/d", "scmos8/25.3/deep", "scmos8/25.3/subm", "scmos8/29.3/deep", "scmos8/29.3/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF Vn.3 0.06 (2 <= n <= 5: parts 0.01, 0.06, 0.06; the cell's last value 0.12 is the all-sides guideline (part iii, marked *) and is not cited); S8 25.3 1 lambda 0.09/0.10 (29.3 for the six-metal top via, same value); 1.2 x 0.10"
+
+[rules."m4.area"]
+kind = "min-area"
+layers = ["m4"]
+value = 0.22
+unit = "um2"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/Mn.3"]
+margin = 1.5
+margin_achieved = 1.524
+engines = ["klayout", "magic"]
+note = "GF Mn.3 0.1444 um2 x 1.5 (single source) = 0.2166, up to 0.22"
+
+# --- via 4 and top metal
+
+[rules."v4.size"]
+kind = "exact-size"
+layers = ["v4"]
+value = 0.36
+unit = "um"
+variant = "ws180g005"
+provenance = "public-source"
+evidence = ["gf180mcu-drm/Vn.1", "xc018/topvia/width", "scmos8/29.1/deep", "scmos8/29.1/subm"]
+engines = ["klayout", "magic"]
+note = "exact (spec 3.3): GF Vn.1 0.26; XC Top Via 0.36; S8 29.1 4 lambda 0.36 / 3 lambda 0.30; the largest public exact size"
+
+[rules."v4.s"]
+kind = "min-space"
+layers = ["v4"]
+value = 0.48
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/Vn.2b", "xc018/topvia/spacing", "scmos8/29.2/deep", "scmos8/29.2/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF Vn.2b 0.36; XC 0.35; S8 29.2 4 lambda 0.36/0.40; 1.2 x 0.40"
+
+[rules."mtop.w"]
+kind = "min-width"
+layers = ["mtop"]
+value = 2.16
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/MT30.1/a", "xc018/topmetal/width", "scmos8/30.1/deep", "scmos8/30.1/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF MT30.1a 1.8; XC Top Metal 0.44; S8 30.1 5 lambda 0.45/0.50; 1.2 x 1.8"
+
+[rules."mtop.w.long"]
+kind = "min-width"
+layers = ["mtop"]
+value = 3.3
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/MT30.1/b"]
+margin = 1.5
+margin_achieved = 1.500
+condition = "length > 800"
+engines = ["klayout"]
+note = "GF MT30.1b 2.2 for lines longer than 1000 um, x 1.5 (single source); the 800 um threshold is chosen: 1000 um x 0.8, so the stricter width applies sooner than at the target"
+
+[rules."mtop.s"]
+kind = "min-space"
+layers = ["mtop"]
+value = 2.16
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/MT30.2", "xc018/topmetal/spacing", "scmos8/30.2/deep", "scmos8/30.2/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF MT30.2 1.8; XC 0.46; S8 30.2 5 lambda 0.45/0.50; 1.2 x 1.8"
+
+[rules."mtop.e.v4"]
+kind = "min-enclosure"
+layers = ["mtop", "v4"]
+value = 0.30
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/MT30.6", "gf180mcu-drm/MT30.5", "scmos8/30.3/deep", "scmos8/30.3/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF MT30.6 0.25 (MT30.5 0.12); S8 30.3 2 lambda 0.18 / 1 lambda 0.10; 1.2 x 0.25"
+
+[rules."mtop.area"]
+kind = "min-area"
+layers = ["mtop"]
+value = 0.845
+unit = "um2"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/MT.4"]
+margin = 1.5
+margin_achieved = 1.502
+implied_by = "rules.mtop.w"
+engines = ["klayout", "magic"]
+note = "GF MT.4 0.5625 um2 x 1.5 (single source) = 0.84375, up to 0.845; implied by rules.mtop.w: 2.16 x 2.16 > 0.845, so no fail fixture"
+
+[rules."mtop.v4.array"]
+kind = "topology"
+layers = ["mtop", "v4"]
+variant = "ws180g005"
+provenance = "public-source"
+evidence = []
+fixture = "v4_array"
+engines = ["klayout"]
+note = "every v4 cluster under mtop is at least 2 x 2: GF180MCU MT30.8b \"There shall be minimum 2X2 array of vias (top vias) at one location connecting to 3um thick top metal.\" (25_Thick_MetalTop_62.csv, row MT30.8b; no value, so no evidence entry)"
+
+# --- pad
+
+[rules."pad.w"]
+kind = "min-width"
+layers = ["pad"]
+value = 60
+unit = "um"
+variant = "ws180g005"
+provenance = "chosen"
+evidence = ["gf180mcu-drm/PAD.1/ball", "gf180mcu-drm/PAD.1/wedge", "scmos8/10.1"]
+engines = ["klayout", "magic"]
+note = "chosen: no binding source. GF PAD.1 40 and PAD.2 sit in a GUIDELINE NO. table, TM.1a 40 is the bump flow, S8 10.1 60 is a guideline; chosen 60 = 1.5 x the GF guideline and equal to the SCMOS guideline"
+
+[rules."pad.s"]
+kind = "min-space"
+layers = ["pad"]
+value = 13.5
+unit = "um"
+variant = "ws180g005"
+provenance = "chosen"
+evidence = ["gf180mcu-drm/PAD.2/ball", "gf180mcu-drm/PAD.2/wedge"]
+engines = ["klayout", "magic"]
+note = "chosen: no binding source. GF PAD.2 9 (a GUIDELINE NO. table) x 1.5"
+
+[rules."mtop.e.pad"]
+kind = "min-enclosure"
+layers = ["mtop", "pad"]
+value = 3.0
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/PAD.4/ball", "scmos8/10.3"]
+margin = 1.5
+margin_achieved = 1.500
+engines = ["klayout", "magic"]
+note = "GF PAD.4 2 x 1.5 (single source; S8 10.3 6 guideline, informative)"
+
+# --- silicide block
+
+[rules."sab.w"]
+kind = "min-width"
+layers = ["sab"]
+value = 0.505
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/SB.1", "scmos8/20.1/deep", "scmos8/20.1/subm"]
+margin = 1.2
+margin_achieved = 1.202
+engines = ["klayout", "magic"]
+note = "GF SB.1 0.42; S8 20.1 4 lambda 0.36/0.40; 1.2 x 0.42 = 0.504, up to 0.505"
+
+[rules."sab.s"]
+kind = "min-space"
+layers = ["sab"]
+value = 0.505
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/SB.2", "scmos8/20.2/deep", "scmos8/20.2/subm"]
+margin = 1.2
+margin_achieved = 1.202
+engines = ["klayout", "magic"]
+note = "GF SB.2 0.42; S8 20.2 4 lambda 0.36/0.40; 1.2 x 0.42 = 0.504, up to 0.505"
+
+[rules."sab.s.co"]
+kind = "min-space"
+layers = ["sab", "co"]
+value = 0.24
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/SB.4", "scmos8/20.3/deep", "scmos8/20.3/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF SB.4 0.15; S8 20.3 2 lambda 0.18/0.20; 1.2 x 0.20"
+
+[rules."sab.e.po"]
+kind = "min-enclosure"
+layers = ["sab", "po&sab"]
+value = 0.265
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/SB.9", "gf180mcu-drm/SB.12", "scmos8/20.9/deep", "scmos8/20.9/subm"]
+margin = 1.2
+margin_achieved = 1.205
+edges = "sides"
+edge_layer = "po"
+engines = ["klayout", "magic"]
+note = "inner edges that are po edges only; the crossing ends are rules.po.x.sab; GF SB.9 0.22, SB.12 0.22; S8 20.9 2 lambda 0.18/0.20; 1.2 x 0.22 = 0.264, up to 0.265"
+
+[rules."sab.e.df"]
+kind = "min-enclosure"
+layers = ["sab", "df&sab"]
+value = 0.265
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/SB.6", "scmos8/20.9/deep", "scmos8/20.9/subm"]
+margin = 1.2
+margin_achieved = 1.205
+edges = "sides"
+edge_layer = "df"
+engines = ["klayout", "magic"]
+note = "inner edges that are df edges only; GF SB.6 0.22; S8 20.9 2 lambda 0.18/0.20; 1.2 x 0.22 = 0.264, up to 0.265"
+
+[rules."po.x.sab"]
+kind = "min-extension"
+layers = ["po", "sab"]
+value = 0.36
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/SB.10", "scmos8/20.10/deep", "scmos8/20.10/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF SB.10 0.22; S8 20.10 3 lambda 0.27/0.30; 1.2 x 0.30"
+
+[rules."df.x.sab"]
+kind = "min-extension"
+layers = ["df", "sab"]
+value = 0.36
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/SB.7", "scmos8/20.10/deep", "scmos8/20.10/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF SB.7 0.22; S8 20.10 3 lambda 0.27/0.30; 1.2 x 0.30"
+
+[rules."sab.s.df"]
+kind = "min-space"
+layers = ["sab", "df.unrelated(sab)"]
+value = 0.265
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/SB.3", "scmos8/20.4/deep", "scmos8/20.4/subm"]
+margin = 1.2
+margin_achieved = 1.205
+engines = ["klayout", "magic"]
+note = "GF SB.3 0.22; S8 20.4 2 lambda 0.18/0.20; 1.2 x 0.22 = 0.264, up to 0.265"
+
+[rules."sab.s.po"]
+kind = "min-space"
+layers = ["sab", "po.unrelated(sab)"]
+value = 0.36
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/SB.5a", "gf180mcu-drm/SB.5b", "scmos8/20.5/deep", "scmos8/20.5/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF SB.5a 0.30, SB.5b 0.28; S8 20.5 2 lambda 0.18/0.20; 1.2 x 0.30"
+
+[rules."sab.area"]
+kind = "min-area"
+layers = ["sab"]
+value = 3.0
+unit = "um2"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/SB.13"]
+margin = 1.5
+margin_achieved = 1.500
+engines = ["klayout", "magic"]
+note = "GF SB.13 2.0 um2 x 1.5 (single source)"
+
+[rules."sab.no.gate"]
+kind = "topology"
+layers = ["sab", "gate"]
+variant = "ws180g005"
+provenance = "public-source"
+evidence = []
+fixture = "sab_on_gate"
+engines = ["klayout", "magic"]
+note = "sab never overlaps gate: GF180MCU SB.16 \"SAB layer cannot exist on 3.3V and 5V/6V CMOS transistors' Poly and COMP area of the core circuit\" (19_SAB_52.csv, row SB.16; no value, so no evidence entry)"
+
+# --- generated selects (proven by construction in layergen, Task 11; no deck rule)
+
+[rules."nsel.w"]
+kind = "min-width"
+layers = ["nsel"]
+value = 0.48
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/NP.1", "scmos8/4.4/deep", "scmos8/4.4/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = []
+note = "GF NP.1 0.40; S8 4.4 4 lambda 0.36 / 2 lambda 0.20; 1.2 x 0.40; width by construction: rules.df.w 0.36 + 2 x rules.sel.x >= 0.48; space by the close step of layergen; both proven by Task 11 unit tests, no fixtures"
+
+[rules."nsel.s"]
+kind = "min-space"
+layers = ["nsel"]
+value = 0.48
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/NP.2", "scmos8/4.4/deep", "scmos8/4.4/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = []
+note = "GF NP.2 0.40; S8 4.4 4 lambda 0.36 / 2 lambda 0.20; 1.2 x 0.40; width by construction: rules.df.w 0.36 + 2 x rules.sel.x >= 0.48; space by the close step of layergen; both proven by Task 11 unit tests, no fixtures"
+
+[rules."psel.w"]
+kind = "min-width"
+layers = ["psel"]
+value = 0.48
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/PP.1", "scmos8/4.4/deep", "scmos8/4.4/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = []
+note = "GF PP.1 0.40; S8 4.4 4 lambda 0.36 / 2 lambda 0.20; 1.2 x 0.40; width by construction: rules.df.w 0.36 + 2 x rules.sel.x >= 0.48; space by the close step of layergen; both proven by Task 11 unit tests, no fixtures"
+
+[rules."psel.s"]
+kind = "min-space"
+layers = ["psel"]
+value = 0.48
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/PP.2", "scmos8/4.4/deep", "scmos8/4.4/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = []
+note = "GF PP.2 0.40; S8 4.4 4 lambda 0.36 / 2 lambda 0.20; 1.2 x 0.40; width by construction: rules.df.w 0.36 + 2 x rules.sel.x >= 0.48; space by the close step of layergen; both proven by Task 11 unit tests, no fixtures"
+
+[rules."sel.x"]
+kind = "generation"
+layers = ["nsel", "psel"]
+value = 0.28
+unit = "um"
+variant = "ws180g005"
+provenance = "derived"
+evidence = ["gf180mcu-drm/NP.5a", "gf180mcu-drm/PP.5a", "gf180mcu-drm/NP.5b", "gf180mcu-drm/PP.5b", "gf180mcu-drm/NP.9", "gf180mcu-drm/PP.9", "scmos8/4.2/deep", "scmos8/4.2/subm"]
+margin = 1.2
+margin_achieved = 1.217
+engines = []
+note = "select extension beyond active, beyond the gate in the poly direction, and beyond SAB poly, read by layergen; GF NP.5a/PP.5a 0.23 overlap of gate, NP.5b/PP.5b 0.16, NP.9/PP.9 0.18; S8 4.2 2 lambda 0.18/0.20; 1.2 x 0.23 = 0.276, up to 0.28"
+
+# --- deep n-well module
+
+[rules."dnw.w"]
+kind = "min-width"
+layers = ["dnw"]
+value = 3.675
+unit = "um"
+variant = "ws180g005"
+module = "deep-n-well"
+provenance = "derived"
+evidence = ["gf180mcu-drm/DN.1", "scmos8/31.1/deep", "scmos8/31.1/subm"]
+margin = 1.2
+margin_achieved = 1.201
+engines = ["klayout", "magic"]
+note = "GF DN.1 1.7; S8 31.1 34 lambda 3.06 / 30 lambda 3.00; 1.2 x 3.06 = 3.672, up to 3.675"
+
+[rules."dnw.s"]
+kind = "min-space"
+layers = ["dnw"]
+value = 6.505
+unit = "um"
+variant = "ws180g005"
+module = "deep-n-well"
+provenance = "derived"
+evidence = ["gf180mcu-drm/DN.2b", "scmos8/31.2/deep", "scmos8/31.2/subm"]
+margin = 1.2
+margin_achieved = 1.200
+engines = ["klayout", "magic"]
+note = "GF DN.2b 5.42; S8 31.2 56 lambda 5.04 / 50 lambda 5.00; 1.2 x 5.42 = 6.504, up to 6.505"
+
+# --- whole layout
+
+[rules."grid"]
+kind = "topology"
+layers = []
+variant = "ws180g005"
+provenance = "public-source"
+evidence = ["gf180mcu-drm/GRID"]
+fixture = "grid"
+engines = ["klayout"]
+note = "all vertices on the 0.005 um grid of process.toml: GF GRID 0.005; GF180MCU OFFGRID \"All edge boundaries must be snapped to the grid defined above.\" (10_Design_Geometry_Rules27.csv; no value, so no evidence entry)"
+
+[rules."angle"]
+kind = "topology"
+layers = []
+variant = "ws180g005"
+provenance = "public-source"
+evidence = []
+fixture = "angle"
+engines = ["klayout"]
+note = "edges orthogonal or at 45 degrees: GF180MCU ACUTE \"All shapes must be orthogonal or on a 45 deg unless otherwise stated.\" (10_Design_Geometry_Rules27.csv, row ACUTE; no value, so no evidence entry)"
+
+[rules."cut.ortho"]
+kind = "topology"
+layers = ["co|v1|v2|v3|v4"]
+variant = "ws180g005"
+provenance = "public-source"
+evidence = ["gf180mcu-drm/CO.1", "gf180mcu-drm/Vn.1", "scmos8/5.1/deep", "scmos8/5.1/subm", "scmos8/6.1/deep", "scmos8/6.1/subm", "scmos8/8.1/deep", "scmos8/8.1/subm", "scmos8/14.1/deep", "scmos8/14.1/subm", "scmos8/21.1/deep", "scmos8/21.1/subm", "scmos8/29.1/deep", "scmos8/29.1/subm"]
+fixture = "cut_ortho"
+engines = ["klayout"]
+note = "co and v1..v4 are orthogonal squares: GF CO.1/Vn.1 min/max sizes; S8 contact and via pages (exact square cuts 5.1, 6.1, 8.1, 14.1, 21.1, 29.1)"

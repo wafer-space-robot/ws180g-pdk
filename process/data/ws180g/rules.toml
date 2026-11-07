@@ -11,7 +11,7 @@
 
 [aliases]
 df = "nd|pd"
-field_po = "po-(df.sized(rules.po.x.df))"
+field_po = "po-df"
 
 # --- n-well
 
@@ -304,8 +304,10 @@ provenance = "derived"
 evidence = ["gf180mcu-drm/PL.5a/5v", "gf180mcu-drm/PL.5b/5v", "scmos8/3.5/deep", "scmos8/3.5/subm"]
 margin = 1.2
 margin_achieved = 1.200
+edges = "exclude"
+edge_layer = "gate"
 engines = ["klayout", "magic"]
-note = "GF PL.5a 0.30, PL.5b 0.30; S8 3.5 1 lambda 0.09/0.10; 1.2 x 0.30"
+note = "field poly to diffusion: the edges of po outside df, except those shared with gate (the gate ends), against the df edges; GF PL.5a 0.30, PL.5b 0.30; S8 3.5 1 lambda 0.09/0.10; 1.2 x 0.30"
 
 [rules."po.e.co"]
 kind = "min-enclosure"

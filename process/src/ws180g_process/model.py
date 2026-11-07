@@ -69,7 +69,8 @@ class RuleField(Strict):
     optional module a rule belongs to. `composed_of` lists evidence ids and full dotted field
     paths the value is built from (the margined part plus the fields named); `implied_by` the
     rule whose fixture already proves this one; `edges = "sides"` restricts the checked inner
-    edges to those of `edge_layer`; `condition` limits where the rule applies; `engines` the
+    edges to those of `edge_layer`, `edges = "exclude"` measures from the edges of the first
+    layer except those shared with `edge_layer`; `condition` limits where the rule applies; `engines` the
     DRC engines that check it (empty: proven by construction, no deck rule).
     """
 
@@ -86,7 +87,7 @@ class RuleField(Strict):
     margin_achieved: Decimal | None = None
     composed_of: list[str] = []
     implied_by: str | None = None
-    edges: Literal["sides"] | None = None
+    edges: Literal["sides", "exclude"] | None = None
     edge_layer: str | None = None
     engines: list[Engine] = ["klayout", "magic"]
     condition: str | None = None

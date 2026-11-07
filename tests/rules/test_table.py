@@ -34,7 +34,7 @@ def test_row_count_equals_the_ws180g005_rules(process, table):
 def test_aliases_expanded(table):
     assert table["df.w"].layers[0] == Union("nd", "pd")
     assert table["po.s.df"].layers[0] == Difference(
-        "po", Sized(Union("nd", "pd"), "rules.po.x.df"))
+        "po", Union("nd", "pd"))
     assert table["sab.s.df"].layers[1] == Unrelated(Union("nd", "pd"), "sab")
 
 
@@ -137,7 +137,7 @@ def test_json_round_trip(table, tmp):
     assert again == table
     data = json.loads(path.read_text(encoding="utf-8"))
     row = next(r for r in data["rows"] if r["id"] == "po.s.df")
-    assert row["layers"][0] == "po-(nd|pd).sized(rules.po.x.df)"
+    assert row["layers"][0] == "po-(nd|pd)"
     assert row["value"] == str(table["po.s.df"].value)
     assert set(data) == {"variant", "layers", "rows"}  # no timestamp
 

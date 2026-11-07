@@ -363,3 +363,5 @@ def test_generated_layers_of_45_degree_diffusions_are_on_the_grid(process):
         off = [(p.x, p.y) for poly in layer.each() for p in poly.each_point_hull()
                if p.x % g or p.y % g]
         assert not off, (name, off[:4])
+    # the snapped selects still never overlap
+    assert (region(layout, top, "nsel", process) & region(layout, top, "psel", process)).is_empty()

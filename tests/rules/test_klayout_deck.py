@@ -170,6 +170,11 @@ def test_idioms(deck):
     assert ".with_area(0, 0.305.um2)" in checks  # df.area
     assert "with_length(800.0.um, nil)" in checks  # mtop.w.long
     assert ".ongrid(0.005.um)" in checks  # grid
+    # the grid check covers the generated layers as well as the drawn ones
+    grid = next(b for b in checks.split("\n\n") if '.output("grid"' in b)
+    assert grid.splitlines()[-1].startswith("all_layers.map { |l| l.ongrid(")
+    listed = re.search(r"^all_layers = \[(.*)\]$", checks, re.MULTILINE)[1].split(", ")
+    assert {"nw", "nd", "m1", "nsel", "psel", "gate", "ntap", "ptap"} <= set(listed)
 
 
 def test_cli(tmp):

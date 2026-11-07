@@ -21,6 +21,12 @@ overhang then falls to nsel, so the selects meet on the straight butting line al
 the actives (GF NP.3d, PP.3d). `P - nd` keeps every p-active covered whatever its width.
 `psel` is computed before `nsel`, which subtracts it, so the two never overlap and meet at
 an nd/pd butting edge. All geometry is in `klayout.db.Region` at the layout dbu 0.001 um.
+
+Every result is snapped to the process grid (`process.toml` `grid`, 0.005 um) after it is
+merged, before a later definition uses it: sizing a 45 degree edge by `x` moves its corners
+by `x tan 22.5` (0.116 um for x = 0.28), off the grid, and a retargeted nsel/psel off the
+grid would fail GF180MCU OFFGRID. The `grid` rule of the KLayout deck checks the generated
+layers as well as the drawn ones.
 """
 
 from collections.abc import Callable, Mapping
@@ -124,6 +130,7 @@ def derive(layout: kdb.Layout, process: Process, variant: str = "ws180g005") -> 
     if generated != set(GENERATED):
         raise ValueError(f"generated layers {sorted(generated)} have no definition table match")
     sizes = _sizes(process)
+    g = to_dbu(process.grid.value)
     tops = list(layout.each_top_cell())
     targets = {name: layout.layer(*process.layers[name].gds) for name in GENERATED}
     # Read every top cell's drawn shapes before any output is written.
@@ -132,7 +139,8 @@ def derive(layout: kdb.Layout, process: Process, variant: str = "ws180g005") -> 
         layers = _Layers(layout, layout.cell(top), process)
         derived = {}
         for name, definition in GENERATED.items():
-            derived[name] = layers[name] = definition(layers, sizes).merged()
+            derived[name] = layers[name] = (
+                definition(layers, sizes).merged().snapped(g, g).merged())
         results.append((top, derived))
     for index in targets.values():
         layout.clear_layer(index)

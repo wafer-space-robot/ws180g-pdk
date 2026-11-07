@@ -21,7 +21,7 @@ uv run pytest -rs -v
 uv run ruff check .
 ```
 
-Run `pytest` from the repository root: the basetemp (`tmp/pytest`) is relative to the invocation directory.
+Run `pytest` from the repository root: the basetemp (`tmp/pytest`) is relative to the invocation directory. pytest clears the basetemp at the start of every run, so do not run two `pytest` processes in one checkout at the same time (use a second worktree).
 
 Gate check 1, KLayout half: `uv run pytest tests/rules/test_klayout_fixtures.py -rs -v` (needs the container
 image) runs every per-rule fixture through the KLayout deck in one container run and checks each
@@ -78,7 +78,11 @@ The build is reproducible (pinned BuildKit, `SOURCE_DATE_EPOCH` from the last co
 `docker/Dockerfile` or `docker/requirements.lock`, rewritten timestamps, no attestations), so the
 printed digest equals `docker/IMAGE_ID`. It refuses to build uncommitted inputs, and pulls the
 base (about 15 GB) on first use. `docker/versions.json` records the tool versions as the tools in
-the image print them (regenerate with `docker/probe_versions.py`, see its docstring). After a
+the image print them (regenerate with `docker/probe_versions.py`, see its docstring). Two
+KLayouts are in use: the fixtures, layer derivation (`ws180g_layergen.derive_file`), retargeting
+and the other generators use the `klayout` Python module (`klayout_python`, 0.30.13, the same
+wheel on the host and in the image's venv), while every DRC run uses the image's `klayout`
+binary (`klayout`, 0.30.12) in the container. After a
 change to the runtime dependencies, regenerate the lock at the repository root with
 `uv export --no-dev --no-emit-workspace --all-packages --format requirements.txt --output-file docker/requirements.lock`.
 

@@ -18,7 +18,8 @@ In order, every step failing the build when it fails:
    `tmp/build/<variant>/` (the sandbox accepts a workdir inside a checkout only under its
    `tmp/`): every fixture through the KLayout deck (`reports/klayout-fixtures.json`), every
    fixture of a Magic rule through Magic (`reports/magic-fixtures.json`), and every gate
-   pass fixture, retargeted, through the public GF180MCU deck for each `metal_top`
+   pass fixture and every permanent regression fixture (`ws180g_precheck.regressions`),
+   retargeted, through the public GF180MCU deck for each `metal_top`
    (`reports/gf180mcu-gate.json`); any fixture with other markers than expected fails;
 5. the release tree `<variant>/` (`ws180g_build.tree.assemble`), and the two generated
    pages copied to `--docs` (default `docs/generated/`, which `docs/rules.md` and
@@ -144,7 +145,7 @@ def run_engines(table: RuleTable, process, fixtures: list[Fixture], generated: P
                 log: Log = _log) -> None:
     """The three container runs of step 4; writes their reports and raises `BuildError`
     when any fixture does not give the expected markers."""
-    from ws180g_precheck.gate import EXCLUDED, gate_fixtures
+    from ws180g_precheck.gate import EXCLUDED, gate_fixtures, write_regressions
     from ws180g_precheck.gf180mcu import run_gf180mcu_drc_many
     from ws180g_precheck.mapping import load_mapping
     from ws180g_precheck.retarget import retarget_file
@@ -181,23 +182,31 @@ def run_engines(table: RuleTable, process, fixtures: list[Fixture], generated: P
     retargeted_dir = work / "gf180mcu" / "retargeted"
     if retargeted_dir.exists():
         shutil.rmtree(retargeted_dir)
+    generic = {_fixture_id(f): f.path for f in gate}
+    # the permanent regression fixtures of gate check 2, as the gate test runs them
+    regression_dir = work / "gf180mcu" / "regressions"
+    if regression_dir.exists():
+        shutil.rmtree(regression_dir)
+    regressions = write_regressions(process, regression_dir)
+    generic.update(regressions)
     retargeted = {}
-    for f in gate:
-        target = retargeted_dir / f.path.parent.name / f.path.name
-        retarget_file(f.path, target, mapping, process, table.variant)
-        retargeted[_fixture_id(f)] = target
+    for case, path in generic.items():
+        target = retargeted_dir / case.split("/")[0] / path.name
+        retarget_file(path, target, mapping, process, table.variant)
+        retargeted[case] = target
     runs = {}
     for metal_top in mapping.drc.metal_top:
         results = run_gf180mcu_drc_many(list(retargeted.values()), work / "gf180mcu" / "run",
                                         runner, mapping, metal_top, jobs=SANDBOX_CPUS,
                                         image_id=image_id)
-        log(f"gf180mcu {metal_top}: {len(gate)} fixtures, {results.cache_hits} from the cache")
+        log(f"gf180mcu {metal_top}: {len(gate)} fixtures and {len(regressions)} regressions, "
+            f"{results.cache_hits} from the cache")
         dirty = {case: results[path].violations for case, path in retargeted.items()
                  if results[path].violations or not results[path].categories_run}
-        runs[metal_top] = {"fixtures": len(gate), "dirty": dirty}
+        runs[metal_top] = {"fixtures": len(retargeted), "dirty": dirty}
         failures += [f"gf180mcu {metal_top} {k}" for k in dirty]
     _write_json(reports / "gf180mcu-gate.json", {
-        "deck": mapping.drc.deck, "runs": runs,
+        "deck": mapping.drc.deck, "runs": runs, "regressions": list(regressions),
         "excluded": {f"{r}/{n}": list(v) for (r, n), v in sorted(EXCLUDED.items())}})
     if failures:
         raise BuildError(f"{len(failures)} fixture(s) gave unexpected markers: "

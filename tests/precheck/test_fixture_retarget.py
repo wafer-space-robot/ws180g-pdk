@@ -5,21 +5,20 @@ public GF180MCU deck, for every `metal_top` value.
 Collection only computes the case ids (from the rule table, writing nothing), so a unit
 run (`-m "not sandbox"`) never touches a gate run's files. The session fixtures write the
 pass fixtures into `tmp/gf180mcu-retarget/fixtures/` (with the regression fixtures of
-`tests/precheck/regressions/`), retarget them into `tmp/gf180mcu-retarget/retargeted/` and
+`ws180g_precheck.regressions`, which the build runs too), retarget them into `tmp/gf180mcu-retarget/retargeted/` and
 run them: one container per `metal_top` value. Results are cached by the retargeted bytes,
 the mapping as used, `metal_top`, the deck path and the image ID; delete
 `tmp/gf180mcu-retarget/run/` to force fresh runs. A fixture excluded under policy (c) of
 `docs/phase-0-retarget-log.md` is listed in `ws180g_precheck.gate.EXCLUDED` with its GF rule
 and reason. A summary of every run is written to `tmp/gf180mcu-retarget/reports/gate.json`."""
 
-import importlib.util
 import json
 import shutil
 import time
 from pathlib import Path
 
 import pytest
-from ws180g_precheck.gate import EXCLUDED
+from ws180g_precheck.gate import EXCLUDED, regression_names, write_regressions
 from ws180g_precheck.gf180mcu import run_gf180mcu_drc_many
 from ws180g_precheck.mapping import load_mapping
 from ws180g_precheck.retarget import retarget_file
@@ -29,7 +28,6 @@ from ws180g_rules.table import RuleTable
 
 REPO = Path(__file__).resolve().parents[2]
 WORK = REPO / "tmp" / "gf180mcu-retarget"
-REGRESSIONS = Path(__file__).resolve().parent / "regressions"
 PROCESS = load_process()
 MAPPING = load_mapping()
 #: Parallel klayout runs inside the one container; the sandbox fixture caps it at 2 CPUs.
@@ -47,9 +45,8 @@ def _pass_ids() -> list[str]:
 
 
 PASS_IDS = _pass_ids()
-REGRESSION_MODULES = sorted(REGRESSIONS.glob("*.py"))
 CASE_IDS = ([i for i in PASS_IDS if tuple(i.split("/", 1)) not in EXCLUDED]
-            + [f"regressions/{m.stem}" for m in REGRESSION_MODULES])
+            + [f"regressions/{name}" for name in regression_names()])
 
 
 @pytest.fixture(scope="session")
@@ -58,13 +55,7 @@ def generic_layouts() -> dict[str, Path]:
     shutil.rmtree(WORK / "fixtures", ignore_errors=True)
     fixtures = write_fixtures(TABLE, PROCESS, WORK / "fixtures")
     out = {f"{f.rule_id}/{f.name}": f.path for f in fixtures if f.expect == "pass"}
-    for module_path in REGRESSION_MODULES:
-        spec = importlib.util.spec_from_file_location(f"regression_{module_path.stem}",
-                                                      module_path)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        path = WORK / "fixtures" / "regressions" / f"{module_path.stem}.gds"
-        out[f"regressions/{module_path.stem}"] = module.build(PROCESS, path)
+    out.update(write_regressions(PROCESS, WORK / "fixtures" / "regressions"))
     return {case_id: out[case_id] for case_id in CASE_IDS}
 
 

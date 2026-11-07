@@ -334,3 +334,34 @@ def test_derive_file_twice_is_byte_identical(process, tmp):
     derive_file(tmp / "in.gds", tmp / "a.gds", process)
     derive_file(tmp / "in.gds", tmp / "b.gds", process)
     assert (tmp / "a.gds").read_bytes() == (tmp / "b.gds").read_bytes()
+
+
+def _chamfered(layout, cell, layer_name, x0, y0, process) -> None:
+    """A 3 x 2 um diffusion with its top-left corner cut at 45 degrees (1 um), at (x0, y0)
+    in dbu."""
+    index = layout.layer(*process.layers[layer_name].gds)
+    points = [(0, 0), (3000, 0), (3000, 2000), (1000, 2000), (0, 1000)]
+    cell.shapes(index).insert(kdb.Polygon([kdb.Point(x0 + px, y0 + py) for px, py in points]))
+
+
+def test_generated_layers_of_45_degree_diffusions_are_on_the_grid(process):
+    """Sizing a 45 degree edge by rules.sel.x moves its corners by x tan 22.5 degrees, off the
+    grid; derive snaps every generated layer to the process grid, so each vertex of every
+    generated layer lies on it (GF180MCU OFFGRID after retargeting nsel/psel)."""
+    g = dbu(process.grid.value)
+    layout, top = new_layout()
+    _chamfered(layout, top, "nd", 0, 0, process)
+    _chamfered(layout, top, "pd", 10000, 0, process)
+    box(layout, top, "nw", "-2", "-2", "5", "4", process)  # the first nd is a tap
+    _chamfered(layout, top, "nd", 0, 10000, process)  # butted to a pd on its right side
+    box(layout, top, "pd", "3", "10", "5", "12", process)
+    box(layout, top, "po", "1.5", "-0.5", "1.7", "2.5", process)  # a gate across the chamfer
+    derive(layout, process)
+    for name in GENERATED_NAMES:
+        layer = region(layout, top, name, process)
+        assert not layer.is_empty(), name
+        off = [(p.x, p.y) for poly in layer.each() for p in poly.each_point_hull()
+               if p.x % g or p.y % g]
+        assert not off, (name, off[:4])
+    # the snapped selects still never overlap
+    assert (region(layout, top, "nsel", process) & region(layout, top, "psel", process)).is_empty()

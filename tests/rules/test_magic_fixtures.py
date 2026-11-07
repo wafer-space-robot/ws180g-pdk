@@ -2,8 +2,9 @@
 """Gate check 1, Magic half (Task 17): every per-rule fixture of Task 14 through the Magic
 technology in the container.
 
-The fixture set is the KLayout half's (`test_klayout_fixtures.FIXTURES`, written under
-`tmp/klayout-fixtures/fixtures/` at collection time). Magic runs once for all of them (one
+The fixture set is the KLayout half's (`test_klayout_fixtures.FIXTURES`, computed at
+collection and written under `tmp/klayout-fixtures/fixtures/` by its session fixture
+`fixture_files`). Magic runs once for all of them (one
 container, one Magic session) in a session-scoped fixture, and each parametrised test reads
 its result. Magic's counts are error tiles, so a fixture is checked by its set of rule ids:
 `magic_markers(fixture)`, the KLayout markers unless `MAGIC_EXCEPTIONS` records Magic's own
@@ -14,7 +15,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from test_klayout_fixtures import FIXTURES, PROCESS, TABLE
+from test_klayout_fixtures import FIXTURES, PROCESS, TABLE, fixture_files  # noqa: F401
 from ws180g_rules.run_magic import run_magic_many
 from ws180g_tech.magic import magic_markers, write_magic_tech
 
@@ -31,8 +32,9 @@ def tech_dir() -> Path:
 
 
 @pytest.fixture(scope="session")
-def magic_results(sandbox, tech_dir):
+def magic_results(sandbox, tech_dir, request):
     """The results of every fixture of a Magic rule, from one Magic session (or the cache)."""
+    request.getfixturevalue("fixture_files")  # the fixture files, written once
     inputs = [f.path for f in FIXTURES if f.rule_id in MAGIC_RULES]
     return run_magic_many(tech_dir, inputs, WORK / "run", sandbox.run, PROCESS)
 

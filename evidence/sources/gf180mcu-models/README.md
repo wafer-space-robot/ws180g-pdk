@@ -18,9 +18,13 @@ ngspice model card `sm141064.ngspice` of the open GF180MCU PDK:
 
 The values were read from the copy installed by **open_pdks commit
 `1689ac3f2dc763876eaf967227c7dfe831b031ae`** at
-`/foss/pdks/gf180mcuD/libs.tech/ngspice/sm141064.ngspice` in the container image
-`ghcr.io/mithro/gf180-tcad-charon:local`, with
-`docker run --rm ghcr.io/mithro/gf180-tcad-charon:local grep -n ... <path>`. **The line
+`/foss/pdks/gf180mcuD/libs.tech/ngspice/sm141064.ngspice` in the pinned base image of
+this repository's container, `ghcr.io/mithro/gf180-tcad-base@sha256:aedc07956fa71f33094decf80828a13e75ace36cb2426f720b0817aa9aca99b6`
+(`BASE_IMAGE` in `docker/Dockerfile`, `base_image` in `docker/versions.json`; the ws180g
+image adds only a Python venv, so the same copy is in it), with
+`build/sandbox-run --workdir tmp/<dir> -- grep -n ... <path>` (checked 2026-11-07: the
+sha256 below, `SOURCES` naming that open_pdks commit, and `lmin=6e-007` on line 37515).
+The values were first read from a local image tag with the same open_pdks commit. **The line
 numbers in every `cite` and the sha256 below refer to that installed copy, not to the
 upstream file.** open_pdks rewrites the card when it installs it (the `.lib` includes
 point at `sm141064.spice`, `.param` lines lose their spaces and quotes, and continuation

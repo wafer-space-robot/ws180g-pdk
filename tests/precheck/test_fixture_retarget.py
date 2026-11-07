@@ -8,9 +8,9 @@ pass fixtures into `tmp/gf180mcu-retarget/fixtures/` (with the regression fixtur
 `tests/precheck/regressions/`), retarget them into `tmp/gf180mcu-retarget/retargeted/` and
 run them: one container per `metal_top` value. Results are cached by the retargeted bytes,
 the mapping as used, `metal_top`, the deck path and the image ID; delete
-`tmp/gf180mcu-retarget/run/` to force fresh runs. A fixture excluded under
-policy (c) of `docs/phase-0-retarget-log.md` is listed in `EXCLUDED` with its GF rule and
-reason. A summary of every run is written to `tmp/gf180mcu-retarget/reports/gate.json`."""
+`tmp/gf180mcu-retarget/run/` to force fresh runs. A fixture excluded under policy (c) of
+`docs/phase-0-retarget-log.md` is listed in `ws180g_precheck.gate.EXCLUDED` with its GF rule
+and reason. A summary of every run is written to `tmp/gf180mcu-retarget/reports/gate.json`."""
 
 import importlib.util
 import json
@@ -19,6 +19,7 @@ import time
 from pathlib import Path
 
 import pytest
+from ws180g_precheck.gate import EXCLUDED
 from ws180g_precheck.gf180mcu import run_gf180mcu_drc_many
 from ws180g_precheck.mapping import load_mapping
 from ws180g_precheck.retarget import retarget_file
@@ -33,19 +34,6 @@ PROCESS = load_process()
 MAPPING = load_mapping()
 #: Parallel klayout runs inside the one container; the sandbox fixture caps it at 2 CPUs.
 JOBS = 2
-
-#: Policy (c): pass fixtures excluded from gate check 2, `(rule id, name)` -> (GF rule,
-#: reason). See docs/phase-0-retarget-log.md.
-_DN3 = ("DN.3", ("each DNWELL must be directly surrounded by a PCOMP guard ring tied to the "
-        "substrate; the dnw fixtures draw a bare deep n-well, and the ring topology is the "
-        "deep-n-well module's open item"))
-EXCLUDED: dict[tuple[str, str], tuple[str, str]] = {
-    ("dnw.w", "min"): _DN3,
-    ("dnw.w", "min_plus_grid"): _DN3,
-    ("dnw.s", "min"): _DN3,
-    ("dnw.s", "min_plus_grid"): _DN3,
-}
-
 
 TABLE = RuleTable.from_process(PROCESS)
 
@@ -135,3 +123,13 @@ def test_case_ids_match_the_written_fixtures(tmp_path):
     writes (here into pytest's own temporary directory, not the gate's)."""
     written = write_fixtures(TABLE, PROCESS, tmp_path / "fixtures")
     assert PASS_IDS == [f"{f.rule_id}/{f.name}" for f in written if f.expect == "pass"]
+
+
+def test_gate_fixtures_are_the_case_ids(tmp_path):
+    """`ws180g_precheck.gate.gate_fixtures` (what the build runs) picks the same pass
+    fixtures as this test, the regression fixtures aside."""
+    from ws180g_precheck.gate import gate_fixtures
+
+    written = write_fixtures(TABLE, PROCESS, tmp_path / "fixtures")
+    assert [f"{f.rule_id}/{f.name}" for f in gate_fixtures(written)] == [
+        c for c in CASE_IDS if not c.startswith("regressions/")]

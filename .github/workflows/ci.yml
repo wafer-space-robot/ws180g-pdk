@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: Apache-2.0
+name: ci
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  host:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --all-packages
+      - run: uv run ruff check .
+      - run: uv run pytest -rs -v -m "not sandbox"
+
+  sandbox:
+    # Manual only: the base image is about 15 GB. If the hosted runner cannot hold it, the
+    # failure is recorded in the Task 23 report and the sandbox tests stay host-run.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --all-packages
+      - name: Pull the base image
+        run: docker pull "$(grep -m1 '^FROM ' docker/Dockerfile | cut -d' ' -f2)"
+      - name: Build docker/
+        run: docker build -t ws180g-sandbox docker/
+      - run: uv run pytest -rs -v -m sandbox

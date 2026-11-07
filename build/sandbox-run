@@ -3,17 +3,21 @@
 # Adapted from mithro/gf180-tcad tools/sandbox-run (Apache-2.0)
 # Run a command in the resource-limited ws180g-pdk container (docker/IMAGE, built by docker/build).
 #   build/sandbox-run [--mem 4g] [--cpus 2] [--pids 2048] [--image REF] --workdir DIR
-#                     [--network none|bridge] -- CMD...
+#                     [--network none|bridge] [--check-only] -- CMD...
 # The repo is mounted read-only at /work/src, DIR read-write at /work/out (the working directory).
 # The command runs as the invoking uid:gid with no capabilities, a read-only root filesystem, a
-# 1 GiB /tmp, no network by default, and memory == memory+swap (no swap).
+# 1 GiB /tmp, no network by default, and memory == memory+swap (no swap). --mem is at most 16g
+# and --cpus is above 0 and at most the host's CPU count, so a typo cannot remove a cap.
+# Without --image, the local image docker/IMAGE names must have the ID in docker/IMAGE_ID.
+# --check-only validates the options and the workdir, then exits 0 without running anything.
 # Exit code is CMD's (137 on OOM kill; 2 when sandbox-run itself refuses). Only CMD's output goes
 # to stdout. Every heavy EDA job (KLayout, Magic, netgen, ngspice) runs through this, never bare.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-MEM=4g CPUS=2 PIDS=2048 NETWORK=none WORKDIR=""
-IMAGE="$(head -n1 "$REPO/docker/IMAGE")"
+MEM=4g CPUS=2 PIDS=2048 NETWORK=none WORKDIR="" CHECK_ONLY=false
+IMAGE="$(head -n1 "$REPO/docker/IMAGE")" CHECK_IMAGE_ID=true
+MAX_MEM_BYTES=$((16 * 1073741824))
 
 die() { echo "sandbox-run: $*" >&2; exit 2; }
 
@@ -22,28 +26,43 @@ while [ $# -gt 0 ]; do
         --mem) MEM="${2:?}"; shift 2 ;;
         --cpus) CPUS="${2:?}"; shift 2 ;;
         --pids) PIDS="${2:?}"; shift 2 ;;
-        --image) IMAGE="${2:?}"; shift 2 ;;
+        --image) IMAGE="${2:?}"; CHECK_IMAGE_ID=false; shift 2 ;;
         --workdir) WORKDIR="${2:?}"; shift 2 ;;
         --network) NETWORK="${2:?}"; shift 2 ;;
+        --check-only) CHECK_ONLY=true; shift ;;
         --) shift; break ;;
         *) die "unknown option: $1" ;;
     esac
 done
 [ $# -gt 0 ] || die "no command given (use -- CMD...)"
 case "$NETWORK" in none|bridge) ;; *) die "--network must be none or bridge" ;; esac
-[[ "$MEM" =~ ^[1-9][0-9]*[kmg]$ ]] || die "--mem must be a size like 4g: $MEM"
+
+# --mem: N followed by k, m or g; at most 16g.
+[[ "$MEM" =~ ^([1-9][0-9]{0,8})([kmg])$ ]] || die "--mem must be a size like 4g: $MEM"
+case "${BASH_REMATCH[2]}" in
+    k) MEM_BYTES=$((BASH_REMATCH[1] * 1024)) ;;
+    m) MEM_BYTES=$((BASH_REMATCH[1] * 1048576)) ;;
+    g) MEM_BYTES=$((BASH_REMATCH[1] * 1073741824)) ;;
+esac
+[ "$MEM_BYTES" -le "$MAX_MEM_BYTES" ] || die "--mem must be at most 16g (the host is shared): $MEM"
+
+# --cpus: a decimal number above 0 and at most the host's CPU count (0 would remove the cap).
+NPROC="$(nproc)"
 [[ "$CPUS" =~ ^[0-9]+(\.[0-9]+)?$ ]] || die "--cpus must be a number: $CPUS"
+awk -v c="$CPUS" -v n="$NPROC" 'BEGIN { exit !(c > 0 && c <= n) }' ||
+    die "--cpus must be above 0 and at most $NPROC: $CPUS"
 [[ "$PIDS" =~ ^[1-9][0-9]*$ ]] || die "--pids must be a positive integer: $PIDS"
+
 [ -n "$WORKDIR" ] || die "--workdir is required"
 [ -d "$WORKDIR" ] || die "workdir does not exist: $WORKDIR"
 WORKDIR="$(cd "$WORKDIR" && pwd -P)"
 REPO="$(cd "$REPO" && pwd -P)"
 # The workdir is mounted read-write. Refuse the filesystem root, $HOME and its ancestors, and
-# every directory whose contents run on the host: the repo (only its gitignored scratch tmp/ may
-# be written), the git dir and git common dir of its checkout (hooks, config; for a worktree they
-# are outside the repo) and the main working tree that owns that common dir. For each, the
-# directory itself and any ancestor of it are refused, and so is anything inside the git dirs.
-# Unrelated directories (sibling checkouts, scratch dirs) are fine.
+# every directory whose contents run on the host: every checkout of this repository (this one,
+# the main working tree and every worktree git lists; inside a checkout only its gitignored
+# scratch tmp/ may be written), the git dir and git common dir (hooks, config; for a worktree
+# they are outside the repo). For each, the directory itself and any ancestor of it are refused,
+# and so is anything inside the git dirs. Unrelated directories (scratch dirs) are fine.
 [ "$WORKDIR" != / ] || die "workdir must not be the filesystem root"
 
 # ancestor WHAT DIR: refuse the workdir if it is DIR or an ancestor of DIR.
@@ -56,6 +75,14 @@ ancestor() {
 inside() {
     case "$WORKDIR/" in
         "$2"/*) die "workdir must not be inside $1 ($2): $WORKDIR" ;;
+    esac
+}
+# checkout WHAT DIR: refuse DIR, its ancestors and anything inside it except DIR/tmp/.
+checkout() {
+    ancestor "$1" "$2"
+    case "$WORKDIR/" in
+        "$2"/tmp/*) ;;
+        "$2"/*) die "workdir inside $1 ($2) must be under its tmp/: $WORKDIR" ;;
     esac
 }
 
@@ -74,20 +101,17 @@ case "$HOME_DIR/" in
     "$WORKDIR"/*) die "workdir must not be \$HOME ($HOME_DIR) or an ancestor of it: $WORKDIR" ;;
 esac
 
-ancestor "the repo root" "$REPO"
-case "$WORKDIR/" in
-    "$REPO"/tmp/*) ;;
-    "$REPO"/*) die "workdir inside the repo must be under its tmp/: $WORKDIR" ;;
-esac
+checkout "the repo root" "$REPO"
 
 # git: a checkout (.git dir or worktree .git file) must resolve, or nothing runs. The GIT_*
 # variables are dropped so they cannot point git at a decoy.
 if [ -e "$REPO/.git" ]; then
     GIT="$(type -P git)" || die "git is not installed, cannot locate the git dirs of $REPO"
+    git_() { env -u GIT_DIR -u GIT_WORK_TREE -u GIT_COMMON_DIR -u GIT_INDEX_FILE \
+        "$GIT" -C "$REPO" "$@"; }
     git_path() {
         local out
-        out="$(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_COMMON_DIR -u GIT_INDEX_FILE \
-            "$GIT" -C "$REPO" rev-parse --path-format=absolute "$1")" && [ -d "$out" ] &&
+        out="$(git_ rev-parse --path-format=absolute "$1")" && [ -d "$out" ] &&
             (cd "$out" && pwd -P)
     }
     GIT_COMMON="$(git_path --git-common-dir)" || die "cannot locate the git common dir of $REPO"
@@ -97,8 +121,28 @@ if [ -e "$REPO/.git" ]; then
     ancestor "the git dir" "$GIT_OWN"
     inside "the git dir" "$GIT_OWN"
     if [ "$(basename "$GIT_COMMON")" = .git ]; then
-        ancestor "the main git checkout" "$(dirname "$GIT_COMMON")"
+        checkout "the main git checkout" "$(dirname "$GIT_COMMON")"
     fi
+    WORKTREES="$(git_ worktree list --porcelain)" || die "cannot list the worktrees of $REPO"
+    while IFS= read -r line; do
+        case "$line" in
+            "worktree "*)
+                wt="${line#worktree }"
+                # A worktree whose directory is gone is checked by its recorded path.
+                if [ -d "$wt" ]; then wt="$(cd "$wt" && pwd -P)"; fi
+                checkout "a git worktree of this repository" "$wt" ;;
+        esac
+    done <<< "$WORKTREES"
+fi
+
+"$CHECK_ONLY" && exit 0
+
+if "$CHECK_IMAGE_ID"; then
+    WANT_ID="$(head -n1 "$REPO/docker/IMAGE_ID")"
+    GOT_ID="$(docker image inspect -f '{{.Id}}' "$IMAGE")" ||
+        die "image $IMAGE is not in the local docker store; build it with docker/build"
+    [ "$GOT_ID" = "$WANT_ID" ] ||
+        die "image $IMAGE has ID $GOT_ID, not $WANT_ID (docker/IMAGE_ID); rebuild with docker/build"
 fi
 
 # The workspace members' sources, importable from the read-only mount.

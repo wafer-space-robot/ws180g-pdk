@@ -365,3 +365,33 @@ def test_generated_layers_of_45_degree_diffusions_are_on_the_grid(process):
         assert not off, (name, off[:4])
     # the snapped selects still never overlap
     assert (region(layout, top, "nsel", process) & region(layout, top, "psel", process)).is_empty()
+
+
+@pytest.mark.parametrize("chamfered", ["nd", "pd"])
+def test_45_degree_chamfer_at_the_butting_edge_keeps_the_selects_on_the_grid(process,
+                                                                              chamfered):
+    """A chamfer that ends on the nd/pd butting edge (the 45 degree edge meets the butting
+    line at a corner of the butting segment): the snapped selects are on the grid, never
+    overlap, and still meet on the butting line along the whole butting segment."""
+    g = dbu(process.grid.value)
+    other = "pd" if chamfered == "nd" else "nd"
+    layout, top = new_layout()
+    index = layout.layer(*process.layers[chamfered].gds)
+    # 3 x 2 um with its top-right corner cut at 45 degrees (1 um): the butting segment at
+    # x = 3 um runs from y = 0 to 1 um, and the chamfer starts at its top end.
+    points = [(0, 0), (3000, 0), (3000, 1000), (2000, 2000), (0, 2000)]
+    top.shapes(index).insert(kdb.Polygon([kdb.Point(px, py) for px, py in points]))
+    box(layout, top, other, "3", "0", "5", "2", process)
+    box(layout, top, "po", "1", "-0.5", "1.2", "2.5", process)  # a gate on the chamfered one
+    derive(layout, process)
+    for name in GENERATED_NAMES:
+        layer = region(layout, top, name, process)
+        off = [(p.x, p.y) for poly in layer.each() for p in poly.each_point_hull()
+               if p.x % g or p.y % g]
+        assert not off, (name, off[:4])
+    sel = {"nd": region(layout, top, "nsel", process), "pd": region(layout, top, "psel", process)}
+    assert (sel["nd"] & sel["pd"]).is_empty()
+    left = rect("2.995", "0", "3", "1")
+    right = rect("3", "0", "3.005", "1")
+    assert (sel[chamfered] & left).area() == left.area()
+    assert (sel[other] & right).area() == right.area()

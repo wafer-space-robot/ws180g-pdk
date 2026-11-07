@@ -8,6 +8,14 @@ from pathlib import Path
 import pytest
 
 
+def pytest_configure(config: pytest.Config) -> None:
+    """Create `tmp/` so `--basetemp=tmp/pytest` works on a fresh clone.
+
+    pytest creates the basetemp directory but not its parent, and `tmp/` is
+    gitignored, so it is missing in CI."""
+    (config.rootpath / "tmp").mkdir(exist_ok=True)
+
+
 @pytest.fixture
 def repo_root() -> Path:
     return Path(__file__).resolve().parent.parent

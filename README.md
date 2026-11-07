@@ -20,3 +20,5 @@ uv sync --all-packages
 uv run pytest -rs -v
 uv run ruff check .
 ```
+
+Run `pytest` from the repository root: the basetemp (`tmp/pytest`) is relative to the invocation directory.

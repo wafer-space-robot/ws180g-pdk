@@ -110,21 +110,21 @@ def run_gf180mcu_drc_many(gds_files: list[Path], out_dir: Path, runner: Runner,
             (out_dir / f"list-{metal_top}-{k}.txt").write_text(
                 "".join(f"{name}\n" for _, name, _ in misses[k::jobs]), encoding="utf-8")
         done = runner(gf180mcu_command(mapping, metal_top, jobs), out_dir)
-        missing = []
-        for gds, name, entry in misses:
-            report = (reports / name).with_suffix(".lyrdb")
-            if not report.is_file():
-                missing.append(f"{gds} ({report})")
-                continue
-            result = parse_lyrdb(report)
-            entry.write_text(result.to_json(), encoding="utf-8")
-            results[gds] = result
+        missing = [f"{gds} ({(reports / name).with_suffix('.lyrdb')})"
+                   for gds, name, _ in misses
+                   if not (reports / name).with_suffix(".lyrdb").is_file()]
         if done.returncode != 0 or missing:
+            # nothing is cached: a report written by a run that then failed is not trusted
             raise RuntimeError(
                 f"GF180MCU deck (metal_top={metal_top}) exit {done.returncode}; "
                 f"no report for {len(missing)}: {'; '.join(missing[:5])}\n"
                 f"{done.stdout[-4000:]}\n{done.stderr[-4000:]}\n"
                 f"logs: {out_dir / 'logs' / metal_top}")
+        parsed = [(gds, entry, parse_lyrdb((reports / name).with_suffix(".lyrdb")))
+                  for gds, name, entry in misses]
+        for gds, entry, result in parsed:
+            entry.write_text(result.to_json(), encoding="utf-8")
+            results[gds] = result
     out = DrcResults((g, results[g]) for g in gds_files)
     out.cache_hits = results.cache_hits
     return out

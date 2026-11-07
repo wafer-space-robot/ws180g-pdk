@@ -111,3 +111,21 @@ def test_jobs_shard_the_list(tmp):
     assert results[inputs[0]].violations == {"DF.3a": 1}
     script = gf180mcu_command(MAPPING, "11K", jobs=2)[2]
     assert "for k in 0 1;" in script and "list-11K-$k.txt" in script
+
+
+def test_failed_run_caches_nothing(tmp):
+    """A run that writes its reports but exits non-zero raises and caches no result, so the
+    next run raises again instead of hitting a bad cache entry."""
+    inputs = _inputs(tmp)
+
+    class Failing(FakeRunner):
+        def __call__(self, cmd, workdir):
+            done = super().__call__(cmd, workdir)
+            return subprocess.CompletedProcess(cmd, 1, done.stdout, "klayout failed: x")
+
+    runner = Failing(dirty=set())
+    for _ in range(2):
+        with pytest.raises(RuntimeError, match="exit 1"):
+            run_gf180mcu_drc_many(inputs, tmp / "run", runner, MAPPING, "9K")
+    assert len(runner.calls) == 2
+    assert list((tmp / "run" / "cache").glob("*.json")) == []

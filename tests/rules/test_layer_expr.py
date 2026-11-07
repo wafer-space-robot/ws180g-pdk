@@ -2,7 +2,6 @@
 """Layer expressions: parsing, precedence, alias expansion and rendering."""
 
 import pytest
-
 from ws180g_rules.layer_expr import (
     Difference,
     Intersection,

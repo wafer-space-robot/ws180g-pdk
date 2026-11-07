@@ -16,7 +16,7 @@ def pytest_configure(config: pytest.Config) -> None:
     (config.rootpath / "tmp").mkdir(exist_ok=True)
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
@@ -78,9 +78,9 @@ class Sandbox:
             capture_output=True, text=True, check=False)
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def sandbox(repo_root: Path) -> Sandbox:
-    """A `Sandbox`; skips the test when Docker or the image in `docker/IMAGE` is missing."""
+    """A `Sandbox` (one per session); skips the test when Docker or the image in `docker/IMAGE` is missing."""
     docker = shutil.which("docker")
     if docker is None:
         pytest.skip("docker is not installed")

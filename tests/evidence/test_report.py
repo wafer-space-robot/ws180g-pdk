@@ -256,3 +256,13 @@ def test_grid_not_a_multiple_fails(data_copy, evidence):
     set_toml(data_copy / "process.toml", ["grid", "value"], GRID_OFF)
     r = margin_report(load_process(data_copy), evidence)
     assert r.grid_ok is False and r.ok is False
+
+
+def test_chosen_rows_print_no_margin_required(report):
+    """A chosen row has no bound, so the report prints no required margin next to it."""
+    text = report.to_markdown()
+    for field in ("rules.pad.w", "rules.pad.s"):
+        assert report[field].status == "chosen"
+        line = next(ln for ln in text.splitlines() if ln.startswith(f"| `{field}` |"))
+        cells = [c.strip() for c in line.strip("|").split(" | ")]
+        assert cells[3:5] == ["", ""], cells  # bound, margin required

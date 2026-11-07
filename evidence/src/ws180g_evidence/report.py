@@ -394,11 +394,13 @@ def _row_line(row: Row) -> str:
     achieved = _dec(row.margin_achieved)
     if row.status == "achieved-mismatch":
         achieved += f" (recorded {_dec(row.recorded) or 'none'})"
+    # a chosen row has no bound, so no margin is required of it
+    required = "" if row.status == "chosen" else _dec(row.margin_required)
     status = f"**{row.status}**" if row.status in FAILING else row.status
     if row.message:
         status += f" ({_cell(row.message)})"
     return (f"| `{row.field}` | {value} | {row.kind} | {_dec(row.bound)} "
-            f"| {_dec(row.margin_required)} | {achieved} | {status} | {cited} "
+            f"| {required} | {achieved} | {status} | {cited} "
             f"| {_ids(row.informative)} | {_cell(row.margin_reason)} |")
 
 

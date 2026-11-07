@@ -78,7 +78,8 @@ def test_min_width_check(deck):
 
 def test_every_checkable_rule_is_output_exactly_once(deck, table):
     ids = Counter(OUTPUT_ID.findall("\n".join(deck.values())))
-    checkable = [r.id for r in table.checkable()]
+    checkable = [r.id for r in table.checkable() if "klayout" in r.engines]
+    assert len(checkable) == len(table.checkable())  # every checkable rule is KLayout's
     assert sorted(ids) == sorted(checkable)
     assert all(n == 1 for n in ids.values()), {k: n for k, n in ids.items() if n != 1}
 

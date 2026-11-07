@@ -6,13 +6,19 @@ retargeting and cell generation agree. The definitions are those of the shared v
 (Phase 0), held in one place in `GENERATED`:
 
 - `gate = po & df`, with `df = nd | pd`
-- `psel = close((pd | (po & sab)).sized(x)) - nd` (unsilicided poly is p+ by default)
+- `psel = open(close(P.sized(x)) - nd) | (P - nd)` with `P = pd | (po & sab)` (unsilicided
+  poly is p+ by default)
 - `nsel = close(nd.sized(x)) - psel`
 - `ntap = nd & nw`
 - `ptap = pd - nw`
 
 where `x = rules.sel.x`, `s = rules.nsel.s` (= `rules.psel.s`) and
-`close(r) = r.sized(s/2).sized(-s/2)` fills every gap narrower than `s` within one select.
+`close(r) = r.sized(s/2).sized(-s/2)` fills every gap narrower than `s` within one select;
+`open(r) = r.sized(-w/2).sized(w/2)` with `w = rules.psel.w` removes the parts of psel
+narrower than `w`: the x-by-x prongs psel would get beyond an nd/pd butting edge, in the
+overhang next to the nd (GF PP.1, NP.5b; found by the Task 18 retarget check). That
+overhang then falls to nsel, so the selects meet on the straight butting line also beyond
+the actives (GF NP.3d, PP.3d). `P - nd` keeps every p-active covered whatever its width.
 `psel` is computed before `nsel`, which subtracts it, so the two never overlap and meet at
 an nd/pd butting edge. All geometry is in `klayout.db.Region` at the layout dbu 0.001 um.
 """
@@ -33,12 +39,23 @@ class Sizes:
     """The rule values the definitions use, in dbu."""
 
     x: int
+    w: int
     s: int
+
+
+def open_(region: kdb.Region, w: int) -> kdb.Region:
+    """Remove every part of `region` narrower than `w`."""
+    return region.sized(-(w // 2)).sized(w // 2)
 
 
 def close(region: kdb.Region, s: int) -> kdb.Region:
     """Fill every gap narrower than `s` between the shapes of `region`."""
     return region.sized(s // 2).sized(-(s // 2))
+
+
+def _psel(p: kdb.Region, nd: kdb.Region, z: Sizes) -> kdb.Region:
+    """`open(close(P.sized(x)) - nd) | (P - nd)`: see the module docstring."""
+    return open_(close(p.sized(z.x), z.s) - nd, z.w) | (p - nd)
 
 
 Definition = Callable[[Mapping[str, kdb.Region], Sizes], kdb.Region]
@@ -47,7 +64,7 @@ Definition = Callable[[Mapping[str, kdb.Region], Sizes], kdb.Region]
 #: drawn layers and the generated layers listed before it.
 GENERATED: dict[str, Definition] = {
     "gate": lambda r, z: r["po"] & (r["nd"] | r["pd"]),
-    "psel": lambda r, z: close((r["pd"] | (r["po"] & r["sab"])).sized(z.x), z.s) - r["nd"],
+    "psel": lambda r, z: _psel(r["pd"] | (r["po"] & r["sab"]), r["nd"], z),
     "nsel": lambda r, z: close(r["nd"].sized(z.x), z.s) - r["psel"],
     "ntap": lambda r, z: r["nd"] & r["nw"],
     "ptap": lambda r, z: r["pd"] - r["nw"],
@@ -69,7 +86,11 @@ def _sizes(process: Process) -> Sizes:
     s_dbu = to_dbu(s)
     if s_dbu % 2:
         raise ValueError(f"rules.nsel.s {s} um is not an even number of database units")
-    return Sizes(x=to_dbu(process.rules["sel.x"].value), s=s_dbu)
+    w_dbu = to_dbu(process.rules["psel.w"].value)
+    if w_dbu % 2:
+        raise ValueError(f"rules.psel.w {process.rules['psel.w'].value} um is not an even number "
+                         "of database units")
+    return Sizes(x=to_dbu(process.rules["sel.x"].value), w=w_dbu, s=s_dbu)
 
 
 class _Layers(dict):

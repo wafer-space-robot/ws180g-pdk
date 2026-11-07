@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Shared fixtures. Later tasks add `report` and `sandbox` here as their interfaces
-appear."""
+"""Shared fixtures. Later tasks add `sandbox` here as its interface
+appears."""
 
 import shutil
 from pathlib import Path
@@ -52,3 +52,11 @@ def evidence():
 def gf_entries(evidence):
     """The entries imported from the GF180MCU design-manual tables, by id."""
     return {k: e for k, e in evidence.entries.items() if e.source == "gf180mcu-drm"}
+
+
+@pytest.fixture
+def report(process, evidence):
+    """The margin report of the real process description against the real evidence set."""
+    from ws180g_evidence.report import margin_report
+
+    return margin_report(process, evidence)

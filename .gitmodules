@@ -1,0 +1,6 @@
+[submodule "libraries/ws180g005_fd_pr"]
+	path = libraries/ws180g005_fd_pr
+	url = https://github.com/wafer-space-robot/ws180g005_fd_pr.git
+[submodule "libraries/ws180g005_fd_io"]
+	path = libraries/ws180g005_fd_io
+	url = https://github.com/wafer-space-robot/ws180g005_fd_io.git

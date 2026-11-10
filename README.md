@@ -11,8 +11,13 @@ Start with the design document:
 Everything in this repository comes from public sources, each cited; nothing here is under a
 non-disclosure agreement. Licence: Apache-2.0 (see [`LICENSE`](LICENSE)).
 
-Status: Phase 0 (foundations) is complete apart from the library repositories; see the gate report,
+Status: Phase 0 (foundations) is complete; see the gate report,
 [`docs/phase-0-report.md`](docs/phase-0-report.md).
+
+The library repositories are git submodules under [`libraries/`](libraries/README.md),
+placeholders in Phase 0. A plain clone, which leaves them as empty directories, is enough for
+the tests and the build; `git submodule update --init` fetches them. Their settings, and this
+repository's, are in [`tools/repo-settings/`](tools/repo-settings/) (`apply.py`, `verify.py`).
 
 ## Development
 
@@ -75,6 +80,11 @@ Two checkers guard every commit:
   `build/private-allow.txt` as `<path glob>: <exact line text>`, each with a comment saying
   why; an entry exempts only that exact line, and an entry that matches nothing is a finding.
 - `uv run ws180g-check-names [ROOT]` checks library, cell, corner and device names.
+
+The private check reads this repository only. Its text scan covers the files git tracks
+here; a submodule under `libraries/` is a commit link, not a file, so the content of a library
+repository is not scanned (in Phase 0 each holds a README and the licence). The naming check
+reads the working tree, so it covers a submodule's files when the submodule is checked out.
 
 Both print one finding per line and exit 1 when there are any. `--cached` makes the private
 check read the staged blobs (index) instead of the working tree, so a line staged with

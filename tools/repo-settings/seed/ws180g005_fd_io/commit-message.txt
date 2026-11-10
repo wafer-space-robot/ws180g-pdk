@@ -1,0 +1,7 @@
+Initial commit: README and licence
+
+Phase 0 placeholder, made by tools/repo-settings/apply.py of
+https://github.com/wafer-space-robot/ws180g-pdk from
+tools/repo-settings/seed/ and LICENSE.
+
+Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>

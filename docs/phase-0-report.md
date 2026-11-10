@@ -21,8 +21,10 @@ this report refers to them by number.
 ## Verdict
 
 All three gate checks pass, with the deviations from the gate wording listed below for
-the owner's agreement. The deliverable "library repositories created" (Task 22) is
-not done: Phase 0 is declared complete without it. The full container build exits 0,
+the owner's agreement. The deliverable "library repositories created" (Task 22) was
+done on 2026-11-10, after the runs this report quotes (see
+[the library repositories](#the-library-repositories)). The
+full container build exits 0,
 the image ID reproduces, a warm rebuild gives an identical output tree, and the CI
 sandbox job on a hosted runner rebuilt the image to the same ID and passed every
 container test it selects (all but the `slow` image-reproducibility test, see [CI](#ci)).
@@ -320,22 +322,34 @@ The gate is met only with these deviations; each needs the owner's agreement.
 3. **"Every generic pass fixture"**: the four `dnw` module fixtures are excluded under policy
    (c), GF DN.3 (plan decision 8): the deep-n-well guard-ring topology is an open item.
 
+(the-library-repositories)=
 ## Phase 0 deliverables: the library repositories (Task 22)
 
 The design document's Phase 0 deliverables include "meta-repository and library repositories
-created". The meta-repository exists; the library repositories do not. **Phase 0 is declared
-complete without Task 22**, which is blocked on the repository owner: creating new public
-repositories in the organisation needs the owner's action. What remains:
+created". The first version of this report declared Phase 0 complete without Task 22, which
+waited for the repository owner's agreement to create public repositories. The owner gave it
+on 2026-11-10 and the task was done that day:
 
-- the two repositories `ws180g005_fd_pr` and `ws180g005_fd_io` (public, Apache-2.0);
-- the settings script `tools/repo-settings/apply.py` with its JSON settings files;
-- `.gitmodules` and the submodules `libraries/ws180g005_fd_pr` and `libraries/ws180g005_fd_io`;
-- `libraries/README.md`.
+- the two repositories
+  [`ws180g005_fd_pr`](https://github.com/wafer-space-robot/ws180g005_fd_pr) and
+  [`ws180g005_fd_io`](https://github.com/wafer-space-robot/ws180g005_fd_io) exist, public,
+  Apache-2.0, each with a placeholder README and the licence and no library content;
+- `tools/repo-settings/apply.py` created them and applied the settings of the
+  meta-repository, which are committed as `repo.json`, `protection.json` and
+  `ruleset-tags.json` beside it; `tools/repo-settings/verify.py` reads a repository's live
+  settings and reports no difference from those files for all three repositories;
+- `.gitmodules` (HTTPS URLs) and the submodules `libraries/ws180g005_fd_pr` and
+  `libraries/ws180g005_fd_io`;
+- [`libraries/README.md`](https://github.com/wafer-space-robot/ws180g-pdk/blob/main/libraries/README.md).
 
-Until then `ws180g-check-names` checks no library tree: `naming.check_tree` finds no
-`libraries/` or `libs.ref/` directory, so it checks nothing there (the run in
-`tmp/t23/ws180g-check-names.log` exits 0 with no finding). The standard-cell library
-repository is created in Phase 1, once its track count exists (plan decision 12).
+Every run this report quotes was made before the submodules existed. In those runs
+`ws180g-check-names` checked no library tree: `naming.check_tree` found no `libraries/` or
+`libs.ref/` directory (the run in `tmp/t23/ws180g-check-names.log` exits 0 with no finding).
+From this change on it checks the two directory names under `libraries/`, and
+`tests/test_submodules.py` checks `.gitmodules`, the two commit links and that both checkers
+pass with the submodules present. The build reads nothing under `libraries/` in Phase 0, so
+its output tree does not depend on them. The standard-cell library repository is created in
+Phase 1, once its track count exists (plan decision 12).
 
 ## Open items
 
@@ -346,8 +360,7 @@ For Phase 1 or for the owner's review:
 - Deep-n-well ring topology (GF DN.3), which also excludes the `dnw` fixtures from gate 2.
 - The single-source margin 1.5 (plan decision 2) and the chosen 800 µm `mtop.w.long`
   threshold (plan decision 15), for the owner's review.
-- The standard-cell library repository (plan decision 12) and the two Phase 0 library
-  repositories (Task 22, above).
+- The standard-cell library repository (plan decision 12).
 - An nd/pd overlap trips no generic rule (`df.s.np` uses `separation`, which does not see
   overlapping shapes).
 - A `cite` field for value-less topology rules (`grid`, `angle`, `mtop.v4.array`), so that

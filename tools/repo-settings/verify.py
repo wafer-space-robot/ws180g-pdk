@@ -6,13 +6,15 @@
 # ///
 """Compare a GitHub repository's live settings with the settings files of `apply.py`.
 
-    uv run tools/repo-settings/verify.py <owner/repo>
+    uv run tools/repo-settings/verify.py <owner/repo> [--seed DIR]
 
 Read-only: three or four `gh api` reads (the repository, the protection of `main`, the
 rulesets and the ruleset named in `ruleset-tags.json`). Prints one line per setting that
 differs from `repo.json`, `protection.json` or `ruleset-tags.json` and exits 1, or prints
-that all settings match and exits 0. Only the keys the files hold are compared. Reading
-`security_and_analysis` needs `gh` logged in as an administrator of the repository.
+that all settings match and exits 0. Only the keys the files hold are compared. With
+`--seed DIR`, the seed directory `apply.py` takes, the repository description is compared
+with `DIR/description.txt` too. Reading `security_and_analysis` needs `gh` logged in as an
+administrator of the repository.
 """
 
 import argparse
@@ -23,7 +25,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-from apply import _repo_argument, run
+from apply import _repo_argument, run, seed_argument
 
 
 def _settings(name: str):
@@ -44,10 +46,15 @@ def _subset(want, live, where: str) -> list[str]:
     return []
 
 
-def differences(repo: dict, protection: dict, rulesets: list[dict]) -> list[str]:
+def differences(
+    repo: dict, protection: dict, rulesets: list[dict], description: str | None = None
+) -> list[str]:
     """Every difference between the settings files and the live answers: the repository,
-    the protection of `main`, and the full rulesets of the repository."""
+    the protection of `main`, and the full rulesets of the repository. `description`, when
+    given, is the expected repository description."""
     found = _subset(_settings("repo.json"), repo, "repo")
+    if description is not None:
+        found += _subset(description, repo.get("description"), "repo.description")
     for key, want in _settings("protection.json").items():
         live = protection.get(key)
         # The read wraps each boolean as {"enabled": ...}; an unset object is left out.
@@ -68,7 +75,9 @@ def main(argv: list[str] | None = None) -> int:
         prog="verify.py", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("repo", type=_repo_argument, metavar="owner/repo")
+    parser.add_argument("--seed", type=Path, metavar="DIR", help="the seed directory of apply.py")
     args = parser.parse_args(argv)
+    seed = seed_argument(parser, args.seed)
     api = f"repos/{args.repo}"
     repo = json.loads(run(["gh", "api", api]))
     protection = json.loads(run(["gh", "api", f"{api}/branches/main/protection"]))
@@ -78,11 +87,12 @@ def main(argv: list[str] | None = None) -> int:
         for r in json.loads(run(["gh", "api", f"{api}/rulesets"]))
         if r["name"] == name
     ]
-    found = differences(repo, protection, rulesets)
+    found = differences(repo, protection, rulesets, seed.description if seed else None)
     for line in found:
         print(line)
     if not found:
-        print(f"{args.repo}: all settings match tools/repo-settings")
+        compared = "tools/repo-settings" + (f" and {args.seed}/description.txt" if seed else "")
+        print(f"{args.repo}: all settings match {compared}")
     return 1 if found else 0
 
 

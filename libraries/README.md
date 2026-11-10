@@ -38,8 +38,8 @@ The submodule URLs are HTTPS, so reading them needs no GitHub account.
 
 The library repositories carry the same settings as this repository (merge commits only,
 protected `main`, the version-tag ruleset). The settings are the JSON files in
-[`tools/repo-settings/`](../tools/repo-settings/), and `apply.py` there created both
-repositories:
+[`tools/repo-settings/`](../tools/repo-settings/), and `apply.py` there creates a library
+repository from them and from the library's seed directory:
 
 ```
 uv run tools/repo-settings/apply.py wafer-space-robot/ws180g005_fd_pr \
@@ -48,7 +48,16 @@ uv run tools/repo-settings/apply.py wafer-space-robot/ws180g005_fd_io \
     --seed tools/repo-settings/seed/ws180g005_fd_io
 ```
 
-`--seed` names the files of the first commit (the library's README; the script adds this
-repository's `LICENSE`), which has to exist before `main` is protected. Add `--dry-run` to
-print the commands without running any. `uv run tools/repo-settings/verify.py <owner/repo>`
-compares a repository's live settings with the files and changes nothing.
+In a seed directory, `files/` is the content of the first commit (the library's README; the
+script adds this repository's `LICENSE`), which has to exist before `main` is protected,
+`commit-message.txt` is that commit's message and `description.txt` the repository
+description. Add `--dry-run` to print the commands without running any.
+
+Both repositories were created on 2026-11-10 with these two commands and, in addition, two
+options the script had at the time, which gave the commit message and the description on
+the command line. That message and those descriptions are the ones now committed in the seed
+directories, so the commands above reproduce the same content, message, description and
+settings.
+
+`uv run tools/repo-settings/verify.py <owner/repo> --seed <seed directory>` compares a
+repository's live settings and description with the files and changes nothing.

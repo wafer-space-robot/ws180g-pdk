@@ -6,6 +6,7 @@ that list, and `verify.py` compares live settings with the files."""
 import importlib.util
 import json
 import os
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -122,13 +123,15 @@ def _dry_run(*args: str) -> subprocess.CompletedProcess:
 
 
 def test_dry_run_prints_the_command_list():
+    """In the order of a real run: both reads come before the create."""
     run = _dry_run("example-owner/example-repo")
     assert run.returncode == 0, run.stderr
-    commands = [line for line in run.stdout.splitlines() if not line.startswith("#")]
+    lines = run.stdout.splitlines()
+    commands = [line for line in lines if not line.startswith("#")]
     assert commands == [
         "gh api repos/example-owner/example-repo",
-        "gh repo create example-owner/example-repo --public",
         "gh api repos/example-owner/example-repo/branches/main",
+        "gh repo create example-owner/example-repo --public",
         (
             "gh api --method PATCH repos/example-owner/example-repo "
             "--input tools/repo-settings/repo.json"
@@ -147,45 +150,85 @@ def test_dry_run_prints_the_command_list():
             "--input tools/repo-settings/ruleset-tags.json"
         ),
     ]
-    assert "dry run" in run.stdout.splitlines()[0]
+    assert "dry run" in lines[0]
+    read_main = lines.index("gh api repos/example-owner/example-repo/branches/main")
+    assert lines[read_main - 1].startswith("# only if the repository exists")
 
 
-def test_dry_run_with_seed_and_description():
-    seed = "tools/repo-settings/seed/ws180g005_fd_pr"
-    run = _dry_run(
-        "example-owner/ws180g005_fd_pr", "--seed", seed, "--description", "ws180g primitives"
-    )
+@pytest.mark.parametrize("library", LIBRARIES)
+def test_dry_run_with_seed(library):
+    """The message and the description come from the committed seed directory."""
+    seed = f"tools/repo-settings/seed/{library}"
+    run = _dry_run(f"example-owner/{library}", "--seed", seed)
     assert run.returncode == 0, run.stderr
     out = run.stdout
-    work = "tmp/repo-settings-seed/ws180g005_fd_pr"
+    work = f"tmp/repo-settings-seed/{library}"
+    description = (REPO / seed / "description.txt").read_text().strip()
     for command in (
         f"git init --quiet --initial-branch=main {work}",
         f"git -C {work} add --all",
-        f"git -C {work} push git@github.com:example-owner/ws180g005_fd_pr.git main",
-        (
-            "gh api --method PATCH repos/example-owner/ws180g005_fd_pr "
-            "-f 'description=ws180g primitives'"
+        f"git -C {work} commit --quiet -F {seed}/commit-message.txt",
+        f"git -C {work} push git@github.com:example-owner/{library}.git main",
+        shlex.join(
+            ["gh", "api", "--method", "PATCH", f"repos/example-owner/{library}"]
+            + ["-f", f"description={description}"]
         ),
     ):
         assert command in out.splitlines(), command
-    assert f"copy {seed}/README.md and LICENSE" in out
+    assert f"copy {seed}/files/README.md and LICENSE" in out
 
 
-@pytest.mark.parametrize("repo", ["no-slash", "a/b/c", "owner/", "owner/re po", "-o/x"])
+@pytest.mark.parametrize(
+    "repo", ["no-slash", "a/b/c", "owner/", "owner/re po", "-o/x", "owner/.", "owner/..", "o/..."]
+)
 def test_bad_repository_argument(repo):
     run = _dry_run(repo)
     assert run.returncode == 2
     assert run.stdout == ""
 
 
-class FakeGh:
-    """Stands in for `apply.run`: answers the reads from `state`, records every command."""
+@pytest.mark.parametrize("repo", ["owner/.github", "owner/a.b", "wafer-space-robot/ws180g-pdk"])
+def test_good_repository_argument(repo):
+    assert _dry_run(repo).returncode == 0
 
-    def __init__(self, exists: bool, main: bool, rulesets: list[dict]):
-        self.exists, self.main, self.rulesets = exists, main, rulesets
+
+class _Done:
+    def __init__(self, returncode: int, stderr: str = ""):
+        self.returncode, self.stdout, self.stderr = returncode, "", stderr
+
+
+@pytest.mark.parametrize(
+    ("stderr", "missing", "expected"),
+    [
+        ("gh: Not Found (HTTP 404)\n", (404,), None),
+        ("gh: Git Repository is empty. (HTTP 409)\n", (404, 409), None),
+        ("gh: Git Repository is empty. (HTTP 409)\n", (404,), SystemExit),
+        ("gh: Not Found (HTTP 404)\n", (), SystemExit),
+        ("gh: Forbidden (HTTP 403)\n", (404, 409), SystemExit),
+    ],
+)
+def test_run_treats_only_the_named_statuses_as_missing(
+    apply, monkeypatch, stderr, missing, expected
+):
+    monkeypatch.setattr(apply.subprocess, "run", lambda *a, **k: _Done(1, stderr))
+    if expected is None:
+        assert apply.run(["gh", "api", "x"], missing=missing) is None
+    else:
+        with pytest.raises(SystemExit):
+            apply.run(["gh", "api", "x"], missing=missing)
+
+
+class FakeGh:
+    """Stands in for `apply.run`: answers the reads from its state, records every command.
+
+    A missing repository answers 404; a missing `main` answers `no_main` (GitHub answers
+    some reads of an empty repository with 409)."""
+
+    def __init__(self, exists: bool, main: bool, rulesets: list[dict], no_main: int = 404):
+        self.exists, self.main, self.rulesets, self.no_main = exists, main, rulesets, no_main
         self.calls: list[list[str]] = []
 
-    def __call__(self, argv, *, ok_missing=False, cwd=None):
+    def __call__(self, argv, *, missing=(), cwd=None):
         self.calls.append([str(a) for a in argv])
         text = " ".join(self.calls[-1])
         if text.startswith("gh repo create"):
@@ -195,15 +238,26 @@ class FakeGh:
         if text.startswith("gh api repos/") and "--method" not in text:
             if text.endswith("/rulesets"):
                 return json.dumps(self.rulesets)
-            found = self.main if text.endswith("/branches/main") else self.exists
-            if not found:
-                assert ok_missing
+            is_main = text.endswith("/branches/main")
+            if not (self.main if is_main else self.exists):
+                assert (self.no_main if is_main else 404) in missing
                 return None
         return "{}"
 
 
 def _methods(calls):
     return [" ".join(c[:5]) for c in calls if "--method" in c]
+
+
+def _seed(tmp_path: Path, description: str | None = "d", message: str | None = None) -> Path:
+    seed = tmp_path / "seed"
+    (seed / "files").mkdir(parents=True)
+    (seed / "files" / "README.md").write_text("# r\n")
+    if description is not None:
+        (seed / "description.txt").write_text(description + "\n")
+    if message is not None:
+        (seed / "commit-message.txt").write_text(message + "\n")
+    return seed
 
 
 def test_apply_to_an_existing_repository_only_reapplies_settings(apply, monkeypatch):
@@ -220,17 +274,27 @@ def test_apply_to_an_existing_repository_only_reapplies_settings(apply, monkeypa
 
 
 def test_apply_creates_and_seeds_a_missing_repository(apply, monkeypatch, tmp_path):
-    seed = tmp_path / "seed"
-    seed.mkdir()
-    (seed / "README.md").write_text("# r\n")
+    seed = _seed(tmp_path, message="first")
     fake = FakeGh(exists=False, main=False, rulesets=[])
     monkeypatch.setattr(apply, "run", fake)
     monkeypatch.setattr(apply, "WORK", tmp_path / "work")
-    assert apply.main(["o/r", "--seed", str(seed), "--description", "d"]) == 0
+    copied = {}
+
+    def spy(argv, **kwargs):
+        if list(argv[:1]) == ["git"] and "commit" in argv:
+            work = tmp_path / "work" / "r"
+            copied["files"] = sorted(p.name for p in work.iterdir())
+        return fake(argv, **kwargs)
+
+    monkeypatch.setattr(apply, "run", spy)
+    assert apply.main(["o/r", "--seed", str(seed)]) == 0
     work = tmp_path / "work" / "r"
+    # Only files/ and the licence are committed, not the description or the message.
+    assert copied["files"] == ["LICENSE", "README.md"]
     assert ["gh", "repo", "create", "o/r", "--public"] in fake.calls
+    commit = ["git", "-C", str(work), "commit", "--quiet", "-F"]
+    assert [*commit, str(seed / "commit-message.txt")] in fake.calls
     assert ["git", "-C", str(work), "push", "git@github.com:o/r.git", "main"] in fake.calls
-    # The seed is in place when git commits it: the README and the meta-repository's licence.
     assert not work.exists()
     order = [c[0] if c[0] == "git" else " ".join(c[:3]) for c in fake.calls]
     assert order.index("gh repo create") < order.index("git") < len(order) - 1
@@ -238,8 +302,29 @@ def test_apply_creates_and_seeds_a_missing_repository(apply, monkeypatch, tmp_pa
     assert ["gh", "api", "--method", "PATCH", "repos/o/r", "-f", "description=d"] in fake.calls
 
 
-def test_apply_refuses_a_repository_without_main_and_without_seed(apply, monkeypatch, capsys):
-    fake = FakeGh(exists=False, main=False, rulesets=[])
+@pytest.mark.parametrize("no_main", [404, 409])
+def test_apply_seeds_an_existing_repository_without_main(apply, monkeypatch, tmp_path, no_main):
+    """The state a first run leaves when it fails between the create and the push."""
+    seed = _seed(tmp_path, description=None)
+    fake = FakeGh(exists=True, main=False, rulesets=[], no_main=no_main)
+    monkeypatch.setattr(apply, "run", fake)
+    monkeypatch.setattr(apply, "WORK", tmp_path / "work")
+    assert apply.main(["o/r", "--seed", str(seed)]) == 0
+    work = tmp_path / "work" / "r"
+    assert not any(c[:3] == ["gh", "repo", "create"] for c in fake.calls)
+    assert ["git", "-C", str(work), "commit", "--quiet", "-m", apply.SEED_MESSAGE] in fake.calls
+    push = ["git", "-C", str(work), "push", "git@github.com:o/r.git", "main"]
+    protect = ["gh", "api", "--method", "PUT", "repos/o/r/branches/main/protection"]
+    assert fake.calls.index(push) < [c[:5] for c in fake.calls].index(protect)
+    # No description.txt: the description is left alone.
+    assert not any("-f" in c for c in fake.calls)
+
+
+@pytest.mark.parametrize("exists", [False, True])
+def test_apply_refuses_a_repository_without_main_and_without_seed(
+    apply, monkeypatch, capsys, exists
+):
+    fake = FakeGh(exists=exists, main=False, rulesets=[])
     monkeypatch.setattr(apply, "run", fake)
     assert apply.main(["o/r"]) == 1
     assert "--seed" in capsys.readouterr().err
@@ -247,13 +332,39 @@ def test_apply_refuses_a_repository_without_main_and_without_seed(apply, monkeyp
     assert all(c[:2] == ["gh", "api"] and "--method" not in c for c in fake.calls)
 
 
+def test_seed_directory_without_files_is_refused(tmp_path):
+    (tmp_path / "README.md").write_text("# r\n")
+    run = _dry_run("o/r", "--seed", str(tmp_path))
+    assert run.returncode == 2
+    assert "files" in run.stderr
+
+
 @pytest.mark.parametrize("library", LIBRARIES)
-def test_seed_readme(library):
-    text = (SETTINGS / "seed" / library / "README.md").read_text()
+def test_seed_directory(library):
+    seed = SETTINGS / "seed" / library
+    assert sorted(p.relative_to(seed).as_posix() for p in seed.rglob("*") if p.is_file()) == [
+        "commit-message.txt",
+        "description.txt",
+        "files/README.md",
+    ]
+    text = (seed / "files" / "README.md").read_text()
     assert text.startswith(f"# {library}")
     assert META_URL in text
     assert "generated by the build" in text
     assert "not be edited by hand" in " ".join(text.split())
+    description = (seed / "description.txt").read_text()
+    assert description.startswith(f"{library}: ") and description.count("\n") == 1
+    assert (seed / "commit-message.txt").read_text().startswith("Initial commit: README")
+
+
+@pytest.mark.parametrize("library", LIBRARIES)
+def test_libraries_readme_gives_the_seed_command(library):
+    text = " ".join((REPO / "libraries" / "README.md").read_text().replace("\\\n", " ").split())
+    assert (
+        f"uv run tools/repo-settings/apply.py wafer-space-robot/{library} "
+        f"--seed tools/repo-settings/seed/{library}"
+    ) in text
+    assert "--seed-message" not in text and "--description" not in text
 
 
 def test_verify_reports_differences(verify):
@@ -267,16 +378,18 @@ def test_verify_reports_differences(verify):
     }
     live_protection["url"] = "https://example.invalid"
     live_ruleset = {**ruleset, "id": 7, "node_id": "x"}
-    live_repo = {**repo, "id": 1, "name": "r"}
+    live_repo = {**repo, "id": 1, "name": "r", "description": "the text"}
     assert verify.differences(live_repo, live_protection, [live_ruleset]) == []
+    assert verify.differences(live_repo, live_protection, [live_ruleset], "the text") == []
 
     live_repo["has_wiki"] = True
     live_protection["enforce_admins"] = {"enabled": False}
     live_protection["restrictions"] = {"users": []}
     live_ruleset["rules"] = []
-    found = verify.differences(live_repo, live_protection, [live_ruleset])
+    found = verify.differences(live_repo, live_protection, [live_ruleset], "another text")
     assert [d.split(":")[0] for d in found] == [
         "repo.has_wiki",
+        "repo.description",
         "protection.enforce_admins",
         "protection.restrictions",
         "ruleset.rules",

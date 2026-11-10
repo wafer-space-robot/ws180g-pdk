@@ -1,0 +1,26 @@
+{
+  "name": "Enforce vXX.ZZZ version tags",
+  "target": "tag",
+  "enforcement": "active",
+  "bypass_actors": [],
+  "conditions": {
+    "ref_name": {
+      "include": [
+        "refs/tags/*"
+      ],
+      "exclude": [
+        "refs/tags/v[0-9].[0-9]",
+        "refs/tags/v[0-9].[0-9][0-9]",
+        "refs/tags/v[0-9].[0-9][0-9][0-9]",
+        "refs/tags/v[0-9][0-9].[0-9]",
+        "refs/tags/v[0-9][0-9].[0-9][0-9]",
+        "refs/tags/v[0-9][0-9].[0-9][0-9][0-9]"
+      ]
+    }
+  },
+  "rules": [
+    {
+      "type": "creation"
+    }
+  ]
+}

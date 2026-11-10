@@ -23,7 +23,7 @@ this report refers to them by number.
 All three gate checks pass, with the deviations from the gate wording listed below for
 the owner's agreement. The deliverable "library repositories created" (Task 22) was
 done on 2026-11-10, after the runs this report quotes (see
-[the library repositories](#phase-0-deliverables-the-library-repositories-task-22)). The
+[the library repositories](#the-library-repositories)). The
 full container build exits 0,
 the image ID reproduces, a warm rebuild gives an identical output tree, and the CI
 sandbox job on a hosted runner rebuilt the image to the same ID and passed every
@@ -322,6 +322,7 @@ The gate is met only with these deviations; each needs the owner's agreement.
 3. **"Every generic pass fixture"**: the four `dnw` module fixtures are excluded under policy
    (c), GF DN.3 (plan decision 8): the deep-n-well guard-ring topology is an open item.
 
+(the-library-repositories)=
 ## Phase 0 deliverables: the library repositories (Task 22)
 
 The design document's Phase 0 deliverables include "meta-repository and library repositories

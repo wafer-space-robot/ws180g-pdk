@@ -23,7 +23,7 @@ TABLE_IDS = {
     "nsel.w", "nsel.s", "psel.w", "psel.s", "nw.tap.dmax", "ps.tap.dmax", "dnw.w", "dnw.s",
     "grid", "angle", "cut.ortho", "sel.x",
 }
-KLAYOUT_ONLY = {"mtop.w.long", "nw.tap.dmax", "ps.tap.dmax", "angle", "cut.ortho"}
+KLAYOUT_ONLY = {"mtop.w.long", "nw.tap.dmax", "ps.tap.dmax", "grid", "angle", "cut.ortho"}
 NO_ENGINE = {"nsel.w", "nsel.s", "psel.w", "psel.s", "sel.x"}
 FIXTURES = {"co.in": "co_on_field", "co.no.gate": "co_on_gate", "co.no.butt": "co_on_butt",
             "sab.no.gate": "sab_on_gate", "mtop.v4.array": "v4_array", "grid": "grid",

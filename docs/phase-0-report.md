@@ -281,22 +281,22 @@ fixtures report per pair or per cut.
 | `v4.size/oversize` | `mtop.v4.array` × 4, `v4.size` × 1 |
 | `v4.size/rect` | `mtop.v4.array` × 4, `v4.size` × 1 |
 
-### Magic exceptions (`MAGIC_EXCEPTIONS`, 2 fixtures)
+### Magic exceptions (`MAGIC_EXCEPTIONS`, 1 fixtures)
 
 | Fail fixture | Rule ids Magic reports | Reason |
 |---|---|---|
-| `grid/grid_45` | none (own rule missed) | the only off-grid vertices are the two ends of a 45 degree edge, and every orthogonal edge lies on a grid line: Magic's off_grid rule checks the position of each orthogonal edge between a layer's types and the others, and Magic stores the 45 degree edge as a split tile whose off-grid corners lie on tile boundaries inside the layer, which no rule sees |
 | `po.x.df/end_inside` | `df.x.po`, `po.x.df` | po ends inside df: Magic finds it (the corner rule of po.x.df), but the gate's end edge borders diffusion like a source/drain edge, so df.x.po also measures the diffusion beyond the poly end against its 0.48 um; an edge rule cannot tell the two apart and cannot withdraw another rule's error |
 
-### KLayout-only rules (5 rules)
+### KLayout-only rules (6 rules)
 
-| Rule | Kind | Why Magic does not check it |
+| Rule | Kind | Why the rule is KLayout-only |
 |---|---|---|
 | `ps.tap.dmax` | max-distance | Magic has no rule for the distance to the nearest shape of a layer |
 | `nw.tap.dmax` | max-distance | Magic has no rule for the distance to the nearest shape of a layer |
 | `cut.ortho` | topology | Magic stores only Manhattan and 45-degree geometry |
 | `mtop.w.long` | min-width | Magic has no width rule conditional on the length of an edge |
 | `angle` | topology | Magic stores only Manhattan and 45-degree geometry |
+| `grid` | topology | (partial check in Magic) Magic's off_grid checks only the position of each orthogonal edge, in each cell's own coordinates, so it misses off-grid vertices at the ends of a 45-degree edge whose orthogonal edges lie on grid lines, and a cell instance placed off the grid (DRC runs in each cell's coordinates; the checked layout is not flattened); and non-Manhattan input at other angles is read as 1 nm staircases, which it flags as grid where KLayout reports angle. One off_grid rule per GDS layer stays as a partial check of the off-grid orthogonal edges per cell |
 
 ### Pass fixtures excluded from gate check 2 (`EXCLUDED`, 4 fixtures)
 

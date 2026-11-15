@@ -259,7 +259,7 @@ def test_expected_markers(fixtures):
 def test_grid_fail_fixture_with_off_grid_45_degree_edge(fixtures, proc):
     """The grid rule's `grid_45` fail fixture: an m1 polygon whose only off-grid vertices
     are the two ends of its 45 degree edge (every orthogonal edge lies on a grid line), the
-    case Magic's off_grid rule misses (MAGIC_EXCEPTIONS)."""
+    case Magic's off_grid rule misses (one reason `grid` is KLayout-only)."""
     f = _get(fixtures, "grid", "fail", "grid_45")
     m1 = _layers(f.path, proc)["m1"]
     diagonal = [e for e in m1.edges() if e.dx() and e.dy()]

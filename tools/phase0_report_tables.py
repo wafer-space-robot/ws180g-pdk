@@ -72,9 +72,11 @@ def tables() -> str:
     out += ["", f"### KLayout-only rules ({len(only)} rules)", ""]
     rows = []
     for row in only:
-        reason = MAGIC_KINDS[magic_key(row)].rule
-        rows.append([f"`{row.id}`", row.kind, reason.removeprefix(KLAYOUT_ONLY)])
-    out += _table(["Rule", "Kind", "Why Magic does not check it"], rows)
+        kind = MAGIC_KINDS[magic_key(row)]
+        reason = kind.rule.removeprefix(KLAYOUT_ONLY)
+        rows.append([f"`{row.id}`", row.kind,
+                     f"(partial check in Magic) {reason}" if kind.partial else reason])
+    out += _table(["Rule", "Kind", "Why the rule is KLayout-only"], rows)
 
     out += ["", (f"### Pass fixtures excluded from gate check 2 (`EXCLUDED`, {len(EXCLUDED)} "
             "fixtures)"), ""]

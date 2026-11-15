@@ -1150,7 +1150,7 @@ variant = "ws180g005"
 provenance = "public-source"
 evidence = ["gf180mcu-drm/GRID"]
 fixture = "grid"
-engines = ["klayout", "magic"]
+engines = ["klayout"]
 note = "all vertices on the 0.005 um grid of process.toml: GF GRID 0.005; GF180MCU OFFGRID \"All edge boundaries must be snapped to the grid defined above.\" (10_Design_Geometry_Rules27.csv; no value, so no evidence entry)"
 
 [rules."angle"]

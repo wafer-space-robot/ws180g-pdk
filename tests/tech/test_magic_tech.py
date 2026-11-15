@@ -49,7 +49,8 @@ def _section(text: str, name: str) -> str:
 
 def _klayout_only_block(drc: str) -> str:
     """The comment lines after the block's heading, up to the first other line."""
-    _, _, rest = drc.partition("# KLayout-only rules (not checked by Magic):\n")
+    _, _, rest = drc.partition("# KLayout-only rules (Magic does not check them, or only a "
+                               "part marked below):\n")
     assert rest, "no KLayout-only block"
     block = []
     for line in rest.splitlines():
@@ -86,7 +87,11 @@ def test_every_magic_rule_has_a_why(tech, table):
     # A why per id cannot catch a dead rule (one that never fires, such as a surround of an
     # empty type list); test_no_empty_type_list and the sandbox probes and fixtures do.
     magic = {r.id for r in table.checkable() if "magic" in r.engines}
-    assert magic and magic == _why_ids(_section(tech, "drc"))
+    # and the KLayout-only rules Magic checks in part (MagicKind.partial)
+    partial = {r.id for r in table.checkable()
+               if r.engines == ["klayout"] and MAGIC_KINDS[magic_key(r)].partial}
+    assert partial == {"grid"}
+    assert magic and magic | partial == _why_ids(_section(tech, "drc"))
 
 
 def test_no_empty_type_list(tech):
@@ -111,10 +116,17 @@ def test_co_s_butt_is_an_edge_rule_across_the_butting_edge(tech):
                          'manhattan_dist "co.s.butt: ', tech, re.MULTILINE), a
 
 
-def test_grid_is_an_off_grid_rule_per_layer(tech, process):
-    # one off_grid rule per drawn or generated GDS layer over the types written to it, so
-    # the edges between types of one layer (the 1 nm unsilicided cores, cut images in their
-    # metal) are not checked, and those of every layer are
+def test_grid_is_klayout_only_with_a_partial_off_grid_check(tech, process, table):
+    # grid stays KLayout-only (Magic misses classes of off-grid vertices); the reason names
+    # the three gaps
+    kind = MAGIC_KINDS["topology:grid"]
+    assert kind.emit is None and kind.partial is not None
+    assert next(r for r in table.rows if r.id == "grid").engines == ["klayout"]
+    for gap in ("45-degree edge", "instance", "staircase", "angle"):
+        assert gap in kind.rule, gap
+    # the partial check: one off_grid rule per drawn or generated GDS layer over the types
+    # written to it, so the edges between types of one layer (the 1 nm unsilicided cores,
+    # cut images in their metal) are not checked, and those of every layer are
     drc = _section(tech, "drc")
     rules = re.findall(r'^ *off_grid (\S+) 5 "grid: (\S+) ', drc, re.MULTILINE)
     from ws180g_tech.klayout import selected_layers
@@ -125,9 +137,20 @@ def test_grid_is_an_off_grid_rule_per_layer(tech, process):
     by_layer = {name: types for types, name in rules}
     assert by_layer["nd"] == "allnd" and by_layer["m1"] == "*m1" and by_layer["v4"] == "via4"
     assert by_layer["nw"] == "nwell" and by_layer["sab"] == "sab"
-    # off_grid checks the edges of tiles, not the ends of a 45 degree edge: a known gap
-    missed = MAGIC_EXCEPTIONS[("grid", "grid_45")]
-    assert missed.own_id_missed and missed.expected == frozenset()
+    assert not {k for k in MAGIC_EXCEPTIONS if k[0] == "grid"}
+
+
+def test_output_types_raise_for_an_unmapped_layer(process):
+    from ws180g_tech.klayout import selected_layers
+    from ws180g_tech.magic import output_types
+
+    layers = selected_layers(process, VARIANT)
+    assert "ndiff" in output_types("nd", layers)
+    assert output_types("mk_res", layers) == ["mk_res"]  # a drawn layer with its own plane
+    # a generated layer outside the core model has no Magic type
+    with pytest.raises(KeyError, match="nosuch"):
+        output_types("nosuch", {**layers, "nosuch": layers["mk_res"].model_copy(
+            update={"kind": "generated"})})
 
 
 def test_v4_array_is_a_cif_check_of_the_merged_clusters(tech):
@@ -167,7 +190,10 @@ def test_klayout_only_rules_are_listed_not_emitted(tech, table):
     assert only
     for rid in only:
         assert re.search(rf"^#\s+{re.escape(rid)}: \S", block, re.MULTILINE), rid
-    assert not set(only) & _why_ids(drc)
+    # only a rule with a partial check has rules in the body, and its line says so
+    assert set(only) & _why_ids(drc) == {"grid"}
+    assert re.search(r"^#\s+grid: partial check below; KLayout-only: ", block, re.MULTILINE)
+    assert not re.search(r"^#\s+angle: partial", block, re.MULTILINE)
 
 
 def test_rules_without_engines_are_absent(tech, table):
@@ -523,5 +549,55 @@ def test_magic_probes(sandbox, work, process):
     counts, whys = _results(_magic(sandbox, work, _drc_script(list(MAGIC_PROBES))))
     assert set(counts) == set(MAGIC_PROBES)
     wrong = {name: sorted(whys[name]) for name, (_, want) in MAGIC_PROBES.items()
+             if whys[name] != want}
+    assert not wrong
+
+
+# The partial grid check (grid is KLayout-only): (polygons of the top cell, polygons of a
+# subcell or None, the subcell's placement, the rule ids Magic reports). KLayout reports
+# grid on each; Magic only where an orthogonal edge is off the grid in its own cell.
+GRID_PROBES = {
+    # an orthogonal edge 2 nm off the grid: flagged
+    "grid_edge": ([("m1", [(0, 0), (2002, 0), (2002, 2000), (0, 2000)])], None, None,
+                  {"grid"}),
+    # the only off-grid vertices end a 45 degree edge, every orthogonal edge on a grid line
+    "grid_45_ends": ([("m1", [(0, 0), (3000, 0), (3000, 2000), (1002, 2000), (0, 998)])],
+                     None, None, set()),
+    # an on-grid m1 box in a subcell placed 2 nm off the grid: Magic checks each cell in its
+    # own coordinates (KLayout: grid x 4)
+    "grid_instance": ([], [("m1", [(0, 0), (2000, 0), (2000, 2000), (0, 2000)])], (2, 0),
+                      set()),
+    # an edge at about 30 degrees, vertices on the grid: Magic reads it as a 1 nm
+    # staircase, whose steps are off the grid (KLayout: angle, no grid)
+    "grid_staircase": ([("m1", [(0, 0), (6000, 0), (6000, 4000), (3465, 4000), (0, 2000)])],
+                       None, None, {"grid"}),
+}
+
+
+def _grid_gds(path: Path, process, cell: str, top, sub, at) -> None:
+    layout = kdb.Layout()
+    layout.dbu = 0.001
+    top_cell = layout.create_cell(cell)
+    for target, polygons in ((top_cell, top), (layout.create_cell(f"{cell}_c"), sub or [])):
+        for name, points in polygons:
+            target.shapes(layout.layer(*process.layers[name].gds)).insert(
+                kdb.Polygon([kdb.Point(x, y) for x, y in points]))
+    if sub:
+        child = layout.cell(f"{cell}_c")
+        top_cell.insert(kdb.CellInstArray(child.cell_index(), kdb.Trans(*at)))
+    else:
+        layout.delete_cell(layout.cell(f"{cell}_c").cell_index())
+    options = kdb.SaveLayoutOptions()
+    options.gds2_write_timestamps = False
+    layout.write(str(path), options)
+
+
+@pytest.mark.sandbox
+def test_grid_partial_check(sandbox, work, process):
+    for name, (top, sub, at, _) in GRID_PROBES.items():
+        _grid_gds(work / f"{name}.gds", process, name, top, sub, at)
+    counts, whys = _results(_magic(sandbox, work, _drc_script(list(GRID_PROBES))))
+    assert set(counts) == set(GRID_PROBES)
+    wrong = {name: sorted(whys[name]) for name, (*_, want) in GRID_PROBES.items()
              if whys[name] != want}
     assert not wrong

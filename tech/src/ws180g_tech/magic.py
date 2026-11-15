@@ -18,14 +18,16 @@ one Magic plane cannot overlap and cross-plane enclosure needs contact types:
   topology rules flag; `cifoutput` style `gds` is the inverse (each GDS layer is the union
   of its types);
 - `cifoutput` style `drc` holds the CIF layers of the checks Magic's edge rules cannot make
-  (flush and inside extension ends, shapes not interacting with sab, sab on a gate); the drc
-  section checks them with `cifmaxwidth <layer> 0` (any shape is an error) and `cifspacing`.
+  (flush and inside extension ends, shapes not interacting with sab, sab on a gate, the v4
+  array clusters); the drc section checks them with `cifmaxwidth <layer> 0` (any shape is an
+  error), `cifspacing` and `cifwidth`.
 
 The `drc` section has one block per rule with Magic among its `engines`, each Magic rule
 with `"<rule id>: ..."` as its why string and its distances in nanometres, and a comment on
 what it measures and where it approximates the KLayout check. Rows with
 `engines == ["klayout"]` are listed with their reason in a comment block at the top of the
-section; rows with no engine are skipped. `MAGIC_KINDS` maps every rule kind, and the special
+section, and one whose key has a `partial` check also gets that block of rules (marked as
+partial); rows with no engine are skipped. `MAGIC_KINDS` maps every rule kind, and the special
 keys for `edges`, `condition`, composed layers and topology fixtures, to the Magic rule
 emitted or to "KLayout-only: <reason>"; a row that lists Magic under a KLayout-only key
 raises `ValueError`. The `extract` section is empty (extraction is Phase 1). The output is
@@ -38,7 +40,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
 
-from ws180g_process.model import Process
+from ws180g_process.model import Layer, Process
 from ws180g_rules.klayout_deck import BUTTING_ALLOWED
 from ws180g_rules.layer_expr import Unrelated
 from ws180g_rules.table import DEFAULT_VARIANT, RuleRow, RuleTable
@@ -174,6 +176,19 @@ def images_on(plane: str) -> list[str]:
     return [metal, *contacts]
 
 
+def output_types(name: str, layers: dict[str, Layer]) -> list[str]:
+    """The Magic types GDS layer `name` is written from: `OUTPUT`, or for a drawn layer
+    outside the core model the type of its own plane. Raises `KeyError` naming any other
+    layer (it has no Magic type)."""
+    if name in OUTPUT:
+        return OUTPUT[name]
+    layer = layers.get(name)
+    if layer is not None and name not in CORE_LAYERS and layer.kind == "drawn":
+        return [name]
+    raise KeyError(f"GDS layer {name!r} has no Magic types (not in OUTPUT, not a drawn layer "
+                   "with a plane of its own)")
+
+
 # --- values and why strings
 
 
@@ -241,6 +256,7 @@ class _Tech:
 
     process: Process
     widths: dict[str, int]
+    layers: dict[str, Layer] = field(default_factory=dict)  # the variant's (selected_layers)
     cif: list[str] = field(default_factory=list)
     cif_names: set[str] = field(default_factory=set)
 
@@ -537,6 +553,91 @@ def _co_on_butt(row: RuleRow, t: _Tech) -> Emitted:
             [f"edge4way {_list(n)} {_list(p)} 1 0 0 0 {why(row)}"])
 
 
+def _co_s_butt(row: RuleRow, t: _Tech) -> Emitted:
+    _arity(row, 3)
+    v = nm(_value(row))
+    return (["space to the nd/pd butting edge: from every edge between a non-contact type of",
+             "one diffusion and any type of the other (a butting edge), no contact within the",
+             "value on the far side. A cut straddling the edge splits into an n- and a",
+             "p-contact type there; that edge has a contact on both sides, so it is left to",
+             "co.no.butt (KLayout excludes straddling cuts too). Past an end of the edge",
+             "where the first diffusion stops (corner types: not that diffusion), the zone",
+             "goes on by the value (corner distance), a square beyond the end as KLayout's",
+             "edge extended by the value (manhattan_dist: without it, `drc euclidean on`",
+             "rounds that corner and a cut 0.1 um by 0.16 um from the end passes); where the",
+             "edge stops at a contact of the first diffusion it does not (that contact",
+             "straddles, or touches, the edge). Idioms: edge4way with corner types and",
+             "distance (Magic technology manual, drc section,",
+             "http://opencircuitdesign.com/magic/techref/maint2.html); manhattan_dist as in",
+             "the IHP-Open-PDK Magic drc rules (ihp-sg13g2/libs.tech/magic/ihp-sg13g2-drc.tech,",
+             "https://github.com/IHP-GmbH/IHP-Open-PDK, Apache-2.0)"],
+            [f"edge4way {_list(_minus(nd, CO))} {_list(pd)} {v} {_not(CO, 'active')} "
+             f"{_not(nd, 'active')} {v} manhattan_dist {why(row)}"
+             for nd, pd in ((ND, PD), (PD, ND))])
+
+
+def _v4_array(row: RuleRow, t: _Tech) -> Emitted:
+    _arity(row, 2)
+    name = str(row.layers[1])
+    (cut,) = _types(row, 1)
+    size, space = nm(t.value(f"rules.{name}.size")), nm(t.value(f"rules.{name}.s"))
+    if space % 2:
+        raise ValueError(f"{row.id}: rules.{name}.s ({space} nm) is not an even number of nm")
+    clusters = t.templayer(f"{name}_clusters", f"{name} clusters: the cuts grown by half of "
+                           f"rules.{name}.s, so the cuts of an array at up to the minimum "
+                           "space merge into one region", [cut, f"grow {space // 2}"])
+    rect = t.templayer(f"{name}_cluster_rect", f"the largest rectangle inside each {name} "
+                       "cluster", [clusters, "maxrect"])
+    rest = t.templayer(f"{name}_cluster_not_rect", f"the parts of each {name} cluster "
+                       "outside its largest rectangle: empty only for a rectangular cluster",
+                       [clusters, f"and-not {rect}"])
+    return ([f"CIF check of the {name} arrays (as the KLayout check): the cuts grown by half",
+             f"of rules.{name}.s merge into one cluster per array; a cluster narrower than",
+             f"2 x rules.{name}.size + rules.{name}.s ({2 * size + space} nm) in either",
+             "direction (a lone cut, a single row or column, an arm one cut wide) or that is",
+             "not its own largest inscribed rectangle (maxrect: a missing cut, a hole, a",
+             "staggered row, an odd-sized cut) is an error. Every cut is a",
+             f"rules.{name}.size square at least rules.{name}.s from the next, so a",
+             "rectangular cluster at least two cuts wide is a full rows x columns array of",
+             "at least 2 x 2 (GF180MCU MT30.8b). Approximation: every via4 is checked (it is",
+             "a contact to mtop by construction; KLayout takes the v4 interacting mtop), and",
+             "a cluster of fewer than 4 cuts that are each oversized to a 1.2 um wide",
+             f"rectangle is left to {name}.size (KLayout also counts the cuts). Idioms:",
+             "templayer, grow and and-not in cifoutput, cifwidth and cifmaxwidth in drc",
+             "(Magic technology manual, http://opencircuitdesign.com/magic/techref/maint2.html);",
+             "maxrect as in the IHP-Open-PDK Magic cifout rules",
+             "(ihp-sg13g2/libs.tech/magic/ihp-sg13g2-cifout.tech,",
+             "https://github.com/IHP-GmbH/IHP-Open-PDK, Apache-2.0)"],
+            [f"cifwidth {clusters} {2 * size + space} {why(row)}",
+             f"cifmaxwidth {rest} 0 bend_illegal {why(row)}"])
+
+
+def _grid(row: RuleRow, t: _Tech) -> Emitted:
+    _arity(row, 0)
+    grid = t.process.grid.value
+    g = nm(grid)
+    rules = [(f'off_grid {_list(output_types(name, t.layers))} {g} '
+              f'"{row.id}: {name} edge off the {_num(grid)} um grid"')
+             for name, layer in t.layers.items() if layer.kind in ("drawn", "generated")]
+    return ([f"off-grid edges: one off_grid rule (grid {g} nm) per drawn or generated GDS layer",
+             "over the types it is written from (cifoutput style gds), so an edge of the",
+             "layer off the grid is an error and the edges between types of one layer (the",
+             "1 nm unsilicided cores of the sab types, cut images inside their metal) are",
+             "not checked. GDS is read at 1 nm per internal unit (cifinput scalefactor 1",
+             "nanometers); layergen, which every checked layout passes through, works at a",
+             "1 nm database unit, so gds read keeps each coordinate as drawn (a finer unit",
+             "makes Magic rescale its grid, and the rule's pitch with it). A partial check",
+             "of a KLayout-only rule: Magic checks orthogonal edges in each cell's own",
+             "coordinates, KLayout the vertices of the flat layout, so it misses an off-grid",
+             "end of a 45 degree edge or an edge at another angle (an end whose orthogonal",
+             "edge lies on a grid line) and an off-grid cell placement; on an edge at",
+             "another angle with its ends on the grid it reports no grid error, as KLayout",
+             "(probed: no 1 nm staircase double report; see the KLayout-only list above).",
+             "Idiom: off_grid (Magic technology",
+             "manual, drc section, http://opencircuitdesign.com/magic/techref/maint2.html)"],
+            rules)
+
+
 def _sab_on_gate(row: RuleRow, t: _Tech) -> Emitted:
     _arity(row, 2)
     t.templayer("sab", "sab", ["sab"])
@@ -548,10 +649,18 @@ def _sab_on_gate(row: RuleRow, t: _Tech) -> Emitted:
 @dataclass(frozen=True)
 class MagicKind:
     """What Magic emits for a key: `rule` describes it, or starts with "KLayout-only: " and
-    gives the reason; `emit` writes it (None: KLayout-only)."""
+    gives the reason; `emit` writes it (None: KLayout-only). `partial`, only for a
+    KLayout-only key, writes rules that check part of it (Magic reports what it can see;
+    the rule stays KLayout-only because Magic misses classes of violations)."""
 
     rule: str
     emit: Callable[[RuleRow, _Tech], Emitted] | None = None
+    partial: Callable[[RuleRow, _Tech], Emitted] | None = None
+
+    def __post_init__(self) -> None:
+        if self.partial is not None and (self.emit is not None
+                                         or not self.rule.startswith("KLayout-only: ")):
+            raise ValueError(f"a partial Magic check is for a KLayout-only key: {self.rule}")
 
 
 MAGIC_KINDS: dict[str, MagicKind] = {
@@ -600,12 +709,21 @@ MAGIC_KINDS: dict[str, MagicKind] = {
     "topology:co_on_butt": MagicKind("edge4way <n contacts> <p contacts> 1 0 0 0", _co_on_butt),
     "topology:sab_on_gate": MagicKind("CIF: cifmaxwidth (sab and allgate) 0", _sab_on_gate),
     "topology:co_s_butt": MagicKind(
-        "KLayout-only: KLayout-only in the rule table since Task 7; a space to the nd/pd "
-        "butting edge (an edge, not a layer) is not attempted in Magic in Phase 0"),
-    "topology:v4_array": MagicKind("KLayout-only: Magic cannot count the cuts of a cluster"),
+        "edge4way <non-contact nd> allpd <v> ~(allco) 0 0, and the same from pd to allnd",
+        _co_s_butt),
+    "topology:v4_array": MagicKind(
+        "CIF: cifwidth <cuts grown by v4.s / 2> <2 x v4.size + v4.s> and cifmaxwidth "
+        "(<clusters> and-not <their maxrect>) 0", _v4_array),
     "topology:grid": MagicKind(
-        "KLayout-only: KLayout-only in the rule table since Task 7; Magic's off_grid rule "
-        "is not attempted in Phase 0"),
+        "KLayout-only: Magic's off_grid checks only the position of each orthogonal edge, "
+        "in each cell's own coordinates, so it misses off-grid vertices at the ends of a "
+        "45-degree edge, or of an edge at any other angle, whose orthogonal edges lie on "
+        "grid lines, and a cell instance placed off the grid (DRC runs in each cell's "
+        "coordinates; the checked layout is not flattened). An edge at another angle with "
+        "its ends on the grid gets no grid error (probed: no 1 nm staircase is flagged; "
+        "KLayout reports it under angle only). One off_grid rule per GDS layer stays as a "
+        "partial check of the off-grid orthogonal edges per cell",
+        partial=_grid),
     "topology:angle": MagicKind(
         "KLayout-only: Magic stores only Manhattan and 45-degree geometry"),
     "topology:cut_ortho": MagicKind(
@@ -631,12 +749,6 @@ MAGIC_EXCEPTIONS: dict[tuple[str, str], MagicException] = {
         "edge borders diffusion like a source/drain edge, so df.x.po also measures the "
         "diffusion beyond the poly end against its 0.48 um; an edge rule cannot tell the "
         "two apart and cannot withdraw another rule's error"),
-    **{("v4.size", name): MagicException(
-        frozenset({"v4.size"}),
-        "a v4 one grid step larger than the others of its 2 x 2 array breaks the array's "
-        "rectangle, so KLayout also reports mtop.v4.array (Task 18); that rule is KLayout-only "
-        "(Magic cannot count the cuts of a cluster), so Magic reports v4.size alone")
-       for name in ("oversize", "rect")},
 }
 
 
@@ -723,7 +835,7 @@ def _cifinput(layers, planes) -> list[str]:
 def _cifoutput(layers, cif: list[str]) -> list[str]:
     lines = ["cifoutput", "style gds", " scalefactor 1 nanometers", ""]
     for name, layer in layers.items():
-        lines += [f" layer {name} {_list(OUTPUT.get(name, [name]))}",
+        lines += [f" layer {name} {_list(output_types(name, layers))}",
                   f"  calma {layer.gds[0]} {layer.gds[1]}"]
     lines += ["", f"style {CIF_DRC}",
               " # the CIF layers of the drc section's cif checks (not for GDS output)",
@@ -732,18 +844,26 @@ def _cifoutput(layers, cif: list[str]) -> list[str]:
 
 
 def _drc(table: RuleTable, t: _Tech) -> list[str]:
-    head = ["drc", " # KLayout-only rules (not checked by Magic):"]
+    heading = " # KLayout-only rules (Magic does not check them, or only a part marked below):"
+    head = ["drc", heading]
     for row in table.checkable():
         if row.engines == ["klayout"]:
             kind = MAGIC_KINDS.get(magic_key(row))
             reason = kind.rule.removeprefix("KLayout-only: ") if kind else "no Magic rule"
-            head.append(f" #   {row.id}: {reason}")
+            mark = "partial check below; KLayout-only: " if kind and kind.partial else ""
+            head.append(f" #   {row.id}: {mark}{reason}")
     body = []
     for row in table.checkable():
-        if "magic" not in row.engines:
+        kind = MAGIC_KINDS.get(magic_key(row))
+        if "magic" in row.engines:
+            comments, rules = _emit(row, t)
+            title = row.id
+        elif row.engines == ["klayout"] and kind is not None and kind.partial is not None:
+            comments, rules = kind.partial(row, t)
+            title = f"{row.id} (KLayout-only; a partial check)"
+        else:
             continue
-        comments, rules = _emit(row, t)
-        body += ["", f" # {row.id}", *(f" # {c}" for c in comments), *(f" {r}" for r in rules)]
+        body += ["", f" # {title}", *(f" # {c}" for c in comments), *(f" {r}" for r in rules)]
     return [*head, "", f" cifstyle {CIF_DRC}", *body, "end"]
 
 
@@ -751,7 +871,7 @@ def tech_text(table: RuleTable, process: Process, variant: str) -> str:
     layers = selected_layers(process, variant)
     widths = {str(r.layers[0]): nm(r.value) for r in table.rows
               if r.kind == "min-width" and r.condition is None and len(r.layers) == 1}
-    t = _Tech(process, widths)
+    t = _Tech(process, widths, layers)
     drc = _drc(table, t)  # first: it defines the CIF layers of the drc style
     planes = _planes(process, variant)
     return "\n".join([

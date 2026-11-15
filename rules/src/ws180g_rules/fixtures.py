@@ -68,7 +68,8 @@ _LENGTH_CONDITION = re.compile(r"^\s*length\s*>\s*(\d+(?:\.\d+)?)\s*$")
 #:   edge is a gate edge: co.s.gate (also 0.24 um) fires with co.po.s.df;
 #: - a rotated cut is neither a square box nor of the exact bounding box: co.size too;
 #: - an off-grid coordinate is shared by the two ends of an orthogonal edge, and a 45 degree
-#:   edge cannot bring both coordinates back on the grid: two grid markers;
+#:   edge cannot bring both coordinates back on the grid: two grid markers (also for the
+#:   `grid_45` fail fixture, whose 45 degree edge has both ends off the grid);
 #: - every v4 cluster is a rectangular array at the minimum space (mtop.v4.array): a
 #:   straight outer edge at the margin meets both cuts of the right column, and columns at
 #:   a space under v4.s are two pairs, so two markers; one cut a grid step larger than the
@@ -80,6 +81,7 @@ EXPECTED_MARKERS: dict[tuple[str, str], dict[str, int]] = {
     ("co.po.s.df", "min_minus_grid"): {"co.po.s.df": 1, "co.s.gate": 1},
     ("cut.ortho", "cut_ortho"): {"cut.ortho": 1, "co.size": 1},
     ("grid", "grid"): {"grid": 2},
+    ("grid", "grid_45"): {"grid": 2},
     ("m4.e.v4", "min_minus_grid"): {"m4.e.v4": 2},
     ("m4.e.v4", "straddle"): {"m4.e.v4": 2},
     ("mtop.e.v4", "min_minus_grid"): {"mtop.e.v4": 2},
@@ -620,14 +622,28 @@ def _co_on_butt(row: RuleRow, k: Kit) -> list[Case]:
 
 def _co_s_butt(row: RuleRow, k: Kit) -> list[Case]:
     """A contact in the nd at `s` from the butting edge (the rule has a value, so the
-    three steps of a space)."""
+    three steps of a space), and the two `corner` cases beyond the end of the edges."""
     a = k.cut("co")
+    v = to_dbu(row.value)
     cases = []
-    for expect, name, s in _steps(to_dbu(row.value), k.g):
+    for expect, name, s in _steps(v, k.g):
         c = Cell()
         _butted(c)
         cut(c, k, "co", -s - a, 600 - a // 2)
         cases.append((expect, name, c))
+    # beyond the end of the butting edges: an L of nd round the corner (0, 1200) of a pd,
+    # the cut in the nd diagonal to that corner, `d` from it in x and in y; KLayout's zone is
+    # each edge extended by the value, a square beyond the end, so the fail case is one grid
+    # step under the value in both directions (a Euclidean corner would pass it). The nd
+    # arm over the pd ends flush with the pd (x = 1500): an arm reaching past it would have
+    # the pd's psel overhang under its bottom edge, where GF NP.5b wants Nplus
+    for expect, d in (("fail", v - k.g), ("pass", v)):
+        c = Cell()
+        c.box("pd", 0, 0, 1500, 1200)
+        c.polygon("nd", [(-2 * UM, 0), (0, 0), (0, 1200), (1500, 1200), (1500, 3 * UM),
+                         (-2 * UM, 3 * UM)])
+        cut(c, k, "co", -d - a, 1200 + d)
+        cases.append((expect, "corner", c))
     return cases
 
 
@@ -653,9 +669,11 @@ def _v4_array(row: RuleRow, k: Kit) -> list[Case]:
 
 
 def _grid(row: RuleRow, k: Kit) -> list[Case]:
-    """An m1 box on the grid (pass), one with an edge 2 dbu off it (fail), and an nd and a pd
+    """An m1 box on the grid (pass), one with an edge 2 dbu off it (fail), an nd and a pd
     with a 45 degree corner (pass, `grid_45`): sizing that edge by rules.sel.x lands off the
-    grid unless layergen snaps the selects."""
+    grid unless layergen snaps the selects; and an m1 whose 45 degree corner edge has both
+    ends 2 dbu off the grid while every orthogonal edge lies on a grid line (fail,
+    `grid_45`)."""
     good, bad = Cell(), Cell()
     good.box("m1", 0, 0, 2 * UM, 2 * UM)
     bad.box("m1", 0, 0, 2 * UM + 2, 2 * UM)  # the right edge 2 dbu off the grid
@@ -663,7 +681,11 @@ def _grid(row: RuleRow, k: Kit) -> list[Case]:
     for layer, x0 in (("nd", 0), ("pd", 6 * UM)):
         chamfered.polygon(layer, [(x0, 0), (x0 + 3 * UM, 0), (x0 + 3 * UM, 2 * UM),
                                   (x0 + UM, 2 * UM), (x0, UM)])
-    return [("pass", "grid", good), ("fail", "grid", bad), ("pass", "grid_45", chamfered)]
+    off_45 = Cell()
+    off_45.polygon("m1", [(0, 0), (3 * UM, 0), (3 * UM, 2 * UM), (UM + 2, 2 * UM),
+                          (0, UM - 2)])
+    return [("pass", "grid", good), ("fail", "grid", bad), ("pass", "grid_45", chamfered),
+            ("fail", "grid_45", off_45)]
 
 
 def _angle(row: RuleRow, k: Kit) -> list[Case]:

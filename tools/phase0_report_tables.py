@@ -60,10 +60,12 @@ def tables() -> str:
                   [[f"`{rid}/{name}`", _markers(m)]
                    for (rid, name), m in sorted(EXPECTED_MARKERS.items())])
 
-    out += ["", f"### Magic exceptions (`MAGIC_EXCEPTIONS`, {len(MAGIC_EXCEPTIONS)} fixtures)",
+    n = len(MAGIC_EXCEPTIONS)
+    out += ["", f"### Magic exceptions (`MAGIC_EXCEPTIONS`, {n} fixture{'' if n == 1 else 's'})",
             ""]
     out += _table(["Fail fixture", "Rule ids Magic reports", "Reason"],
-                  [[f"`{rid}/{name}`", _markers(e.expected), e.reason]
+                  [[f"`{rid}/{name}`", _markers(e.expected) or "none (own rule missed)",
+                    e.reason]
                    for (rid, name), e in sorted(MAGIC_EXCEPTIONS.items())])
 
     table = RuleTable.from_process(load_process())
@@ -71,9 +73,11 @@ def tables() -> str:
     out += ["", f"### KLayout-only rules ({len(only)} rules)", ""]
     rows = []
     for row in only:
-        reason = MAGIC_KINDS[magic_key(row)].rule
-        rows.append([f"`{row.id}`", row.kind, reason.removeprefix(KLAYOUT_ONLY)])
-    out += _table(["Rule", "Kind", "Why Magic does not check it"], rows)
+        kind = MAGIC_KINDS[magic_key(row)]
+        reason = kind.rule.removeprefix(KLAYOUT_ONLY)
+        rows.append([f"`{row.id}`", row.kind,
+                     f"(partial check in Magic) {reason}" if kind.partial else reason])
+    out += _table(["Rule", "Kind", "Why the rule is KLayout-only"], rows)
 
     out += ["", (f"### Pass fixtures excluded from gate check 2 (`EXCLUDED`, {len(EXCLUDED)} "
             "fixtures)"), ""]

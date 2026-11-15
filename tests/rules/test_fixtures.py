@@ -253,6 +253,37 @@ def test_expected_markers(fixtures):
     assert by_key[("nw.w", "pass", "min")].markers() == {}
     assert by_key[("nw.w", "fail", "min_minus_grid")].markers() == {"nw.w": 1}
     assert by_key[("grid", "fail", "grid")].markers() == {"grid": 2}
+    assert by_key[("grid", "fail", "grid_45")].markers() == {"grid": 2}
+
+
+def test_grid_fail_fixture_with_off_grid_45_degree_edge(fixtures, proc):
+    """The grid rule's `grid_45` fail fixture: an m1 polygon whose only off-grid vertices
+    are the two ends of its 45 degree edge (every orthogonal edge lies on a grid line), the
+    case Magic's off_grid rule misses (one reason `grid` is KLayout-only)."""
+    f = _get(fixtures, "grid", "fail", "grid_45")
+    m1 = _layers(f.path, proc)["m1"]
+    diagonal = [e for e in m1.edges() if e.dx() and e.dy()]
+    assert len(diagonal) == 1 and abs(diagonal[0].dx()) == abs(diagonal[0].dy())
+    assert all(p.x % GRID or p.y % GRID for p in (diagonal[0].p1, diagonal[0].p2))
+    for e in m1.edges():
+        if e.dx() == 0:
+            assert e.p1.x % GRID == 0, e
+        elif e.dy() == 0:
+            assert e.p1.y % GRID == 0, e
+
+
+def test_co_s_butt_corner_fixtures(fixtures, proc):
+    """co.s.butt beyond the end of the butting edges: an L of nd round a pd corner, a cut in
+    the nd diagonal to the corner (0, 1200), 0.16 um from it in x and y (fail: KLayout's
+    zone is the edge extended by 0.165 um, a square beyond the end) or 0.165 um (pass)."""
+    for expect, d in (("fail", 160), ("pass", 165)):
+        f = _get(fixtures, "co.s.butt", expect, "corner")
+        assert f.markers() == ({"co.s.butt": 1} if expect == "fail" else {})
+        layers = _layers(f.path, proc)
+        (co,) = _boxes(layers["co"])
+        assert (co.right, co.bottom) == (-d, 1200 + d)
+        assert (layers["nd"] & layers["pd"]).is_empty()
+        assert _boxes(layers["pd"]) == [kdb.Box(0, 0, 1500, 1200)]
 
 
 def test_pass_fixture_v4_clusters_are_rectangular_arrays(fixtures, proc):

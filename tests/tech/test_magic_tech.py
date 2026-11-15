@@ -49,7 +49,8 @@ def _section(text: str, name: str) -> str:
 
 def _klayout_only_block(drc: str) -> str:
     """The comment lines after the block's heading, up to the first other line."""
-    _, _, rest = drc.partition("# KLayout-only rules (not checked by Magic):\n")
+    _, _, rest = drc.partition("# KLayout-only rules (Magic does not check them, or only a "
+                               "part marked below):\n")
     assert rest, "no KLayout-only block"
     block = []
     for line in rest.splitlines():
@@ -86,7 +87,11 @@ def test_every_magic_rule_has_a_why(tech, table):
     # A why per id cannot catch a dead rule (one that never fires, such as a surround of an
     # empty type list); test_no_empty_type_list and the sandbox probes and fixtures do.
     magic = {r.id for r in table.checkable() if "magic" in r.engines}
-    assert magic and magic == _why_ids(_section(tech, "drc"))
+    # and the KLayout-only rules Magic checks in part (MagicKind.partial)
+    partial = {r.id for r in table.checkable()
+               if r.engines == ["klayout"] and MAGIC_KINDS[magic_key(r)].partial}
+    assert partial == {"grid"}
+    assert magic and magic | partial == _why_ids(_section(tech, "drc"))
 
 
 def test_no_empty_type_list(tech):
@@ -97,6 +102,73 @@ def test_no_empty_type_list(tech):
 
 def test_pad_enclosure_is_a_cross_plane_surround(tech):
     assert re.search(r'^ *surround pad \*mtop 3000 absence_ok "mtop.e.pad', tech, re.MULTILINE)
+
+
+def test_co_s_butt_is_an_edge_rule_across_the_butting_edge(tech):
+    # from each nd/pd butting edge (non-contact diffusion on one side, any type of the other
+    # diffusion on the other), no contact within the value on the far side; the zone goes on
+    # past an end of the edge by the value where the first diffusion stops there, as a
+    # square (manhattan_dist; KLayout extends the edge by the value)
+    nd = "ndiff,nsubdiff,rndiff,ntransistor"
+    pd = "pdiff,psubdiff,rpdiff,ptransistor"
+    for a, b, own in ((nd, "allpd", "allnd"), (pd, "allnd", "allpd")):
+        assert re.search(rf'^ *edge4way {a} {b} 165 ~\(allco\)/active ~\({own}\)/active 165 '
+                         'manhattan_dist "co.s.butt: ', tech, re.MULTILINE), a
+
+
+def test_grid_is_klayout_only_with_a_partial_off_grid_check(tech, process, table):
+    # grid stays KLayout-only (Magic misses classes of off-grid vertices); the reason names
+    # the three gaps
+    kind = MAGIC_KINDS["topology:grid"]
+    assert kind.emit is None and kind.partial is not None
+    assert next(r for r in table.rows if r.id == "grid").engines == ["klayout"]
+    for gap in ("45-degree edge", "instance", "other angle", "no grid error"):
+        assert gap in kind.rule, gap
+    # the partial check: one off_grid rule per drawn or generated GDS layer over the types
+    # written to it, so the edges between types of one layer (the 1 nm unsilicided cores,
+    # cut images in their metal) are not checked, and those of every layer are
+    drc = _section(tech, "drc")
+    rules = re.findall(r'^ *off_grid (\S+) 5 "grid: (\S+) ', drc, re.MULTILINE)
+    from ws180g_tech.klayout import selected_layers
+
+    layers = [n for n, layer in selected_layers(process, VARIANT).items()
+              if layer.kind in ("drawn", "generated")]
+    assert len(rules) == len(layers) and {name for _, name in rules} == set(layers)
+    by_layer = {name: types for types, name in rules}
+    assert by_layer["nd"] == "allnd" and by_layer["m1"] == "*m1" and by_layer["v4"] == "via4"
+    assert by_layer["nw"] == "nwell" and by_layer["sab"] == "sab"
+    assert not {k for k in MAGIC_EXCEPTIONS if k[0] == "grid"}
+
+
+def test_output_types_raise_for_an_unmapped_layer(process):
+    from ws180g_tech.klayout import selected_layers
+    from ws180g_tech.magic import output_types
+
+    layers = selected_layers(process, VARIANT)
+    assert "ndiff" in output_types("nd", layers)
+    assert output_types("mk_res", layers) == ["mk_res"]  # a drawn layer with its own plane
+    # a generated layer outside the core model has no Magic type
+    with pytest.raises(KeyError, match="nosuch"):
+        output_types("nosuch", {**layers, "nosuch": layers["mk_res"].model_copy(
+            update={"kind": "generated"})})
+
+
+def test_v4_array_is_a_cif_check_of_the_merged_clusters(tech):
+    # the cuts grown by half of rules.v4.s merge into one cluster per array; a cluster
+    # narrower than 2 x rules.v4.size + rules.v4.s (1.2 um) or other than its largest
+    # inscribed rectangle (maxrect) is an error
+    cifout = _section(tech, "cifoutput")
+    assert re.search(r"^ *templayer c_v4_clusters via4\n *grow 240$", cifout, re.MULTILINE)
+    assert re.search(r"^ *templayer c_v4_cluster_rect c_v4_clusters\n *maxrect$", cifout,
+                     re.MULTILINE)
+    assert re.search(r"^ *templayer c_v4_cluster_not_rect c_v4_clusters\n"
+                     r" *and-not c_v4_cluster_rect$", cifout, re.MULTILINE)
+    drc = _section(tech, "drc")
+    assert re.search(r'^ *cifwidth c_v4_clusters 1200 "mtop.v4.array: ', drc, re.MULTILINE)
+    assert re.search(r'^ *cifmaxwidth c_v4_cluster_not_rect 0 bend_illegal "mtop.v4.array: ',
+                     drc, re.MULTILINE)
+    # Magic now reports mtop.v4.array with v4.size on an odd-sized cut, as KLayout does
+    assert not {k for k in MAGIC_EXCEPTIONS if k[0] == "v4.size"}
 
 
 def test_magic_markers(tmp):
@@ -118,7 +190,10 @@ def test_klayout_only_rules_are_listed_not_emitted(tech, table):
     assert only
     for rid in only:
         assert re.search(rf"^#\s+{re.escape(rid)}: \S", block, re.MULTILINE), rid
-    assert not set(only) & _why_ids(drc)
+    # only a rule with a partial check has rules in the body, and its line says so
+    assert set(only) & _why_ids(drc) == {"grid"}
+    assert re.search(r"^#\s+grid: partial check below; KLayout-only: ", block, re.MULTILINE)
+    assert not re.search(r"^#\s+angle: partial", block, re.MULTILINE)
 
 
 def test_rules_without_engines_are_absent(tech, table):
@@ -203,9 +278,9 @@ def test_cif_checks_have_their_style(tech):
 
 
 def test_a_magic_row_that_magic_cannot_check_raises(table, process, tmp):
-    rows = [dataclasses.replace(r, engines=["klayout", "magic"]) if r.id == "grid" else r
+    rows = [dataclasses.replace(r, engines=["klayout", "magic"]) if r.id == "angle" else r
             for r in table.rows]
-    with pytest.raises(ValueError, match="grid"):
+    with pytest.raises(ValueError, match="angle"):
         write_magic_tech(dataclasses.replace(table, rows=rows), process, VARIANT, tmp / "x")
 
 
@@ -313,6 +388,19 @@ def test_drc_passes_a_legal_transistor_and_flags_narrow_poly(sandbox, work, proc
     assert counts.get("narrow", 0) >= 1 and "po.w" in whys["narrow"], out
 
 
+def _cells(cols: int, rows: int) -> list[tuple[int, int]]:
+    return [(c, r) for c in range(cols) for r in range(rows)]
+
+
+def _v4_array(cells: list[tuple[int, int]]) -> list[tuple[str, int, int, int, int]]:
+    """v4 cuts (0.36 um) at (column, row) of a grid at the minimum space (0.48 um), under
+    an m4 and an mtop plate that enclose them all."""
+    pitch = 360 + 480
+    plate = [("m4", -2000, -2000, 6000, 6000), ("mtop", -2000, -2000, 6000, 6000)]
+    return [*plate, *(("v4", c * pitch, r * pitch, c * pitch + 360, r * pitch + 360)
+                      for c, r in cells)]
+
+
 # Probes: (boxes in dbu, the exact set of rule ids Magic reports). The first group is the
 # KLayout deck's review probes (tests/rules/test_klayout_deck.py) with the ids KLayout
 # reports on them; "differs" marks the documented approximations of the Magic rules, where
@@ -380,6 +468,32 @@ MAGIC_PROBES: dict[str, tuple[list[tuple[str, int, int, int, int]], set[str]]] =
     "co_butt": ([("nw", -3000, -3000, 5000, 5000), ("pd", 0, 0, 1000, 1000),
                  ("nd", 1000, 0, 2000, 1000), ("co", 890, 390, 1110, 610),
                  ("m1", 500, 0, 1500, 1000)], {"co.no.butt"}),
+    # co.s.butt (0.165): a cut on either side of the butting edge closer than the value, or
+    # with an edge on it, and one at exactly the value
+    **{name: ([("nw", -3000, -3000, 5000, 5000), ("pd", 0, 0, 1000, 1000),
+               ("nd", 1000, 0, 2000, 1000), ("co", x, 390, x + 220, 610),
+               ("m1", x - 390, 0, x + 610, 1000)], want)
+       for name, x, want in (("co_near_butt_p", 700, {"co.s.butt"}),
+                             ("co_near_butt_n", 1080, {"co.s.butt"}),
+                             ("co_on_butt_edge", 780, {"co.s.butt"}),
+                             ("co_at_butt_space", 615, set()))},
+    # co.s.butt beyond the ends of the butting edges: an L of nd round the corner of a pd
+    # (the edges x = 0 and y = 1200 end at (0, 1200)); a cut in the nd diagonal to that end,
+    # dx and dy from it. KLayout's zone is the edge extended by the value (a square beyond
+    # the end), so the cut is too close when both are under the value
+    **{name: ([("pd", 0, 0, 1500, 1200), ("nd", -2000, 0, 0, 3000), ("nd", 0, 1200, 2000, 3000),
+               ("co", -dx - 220, 1200 + dy, -dx, 1420 + dy),
+               ("m1", -dx - 620, 800 + dy, -dx + 400, 1820 + dy)], want)
+       for name, dx, dy, want in (("butt_corner", 100, 100, {"co.s.butt"}),
+                                  ("butt_corner_160", 100, 160, {"co.s.butt"}),
+                                  ("butt_corner_150", 150, 150, {"co.s.butt"}),
+                                  ("butt_corner_165", 100, 165, set()),
+                                  ("butt_corner_far", 165, 165, set()))},
+    # the reviewer's probe: nd taller than pd (the vertical butting edge ends at y = 1200),
+    # a cut 100 nm from the end in x and y; df.e.co too (the nd ends 0.1 um from the cut)
+    "butt_end_tall_nd": ([("pd", 0, 0, 1500, 1200), ("nd", -2000, 0, 0, 3000),
+                          ("co", -320, 1300, -100, 1520), ("m1", -720, 900, 300, 1920)],
+                         {"co.s.butt", "df.e.co"}),
     "co_straddle_df": ([("nd", 0, 0, 1000, 1000), ("co", 900, 300, 1120, 520),
                         ("m1", 500, 0, 1500, 1000)], {"co.in", "df.e.co"}),
     "co_df_close": ([("nd", 0, 0, 1000, 1000), ("co", 700, 300, 920, 520),
@@ -414,6 +528,17 @@ MAGIC_PROBES: dict[str, tuple[list[tuple[str, int, int, int, int]], set[str]]] =
     "df_np_near": ([("nd", 0, 0, 1000, 1000), ("pd", 1450, 0, 2450, 1000)], {"df.s.np"}),
     "df_np_butted": ([("pd", 1000, 0, 2000, 1000), ("nd", 0, 0, 1000, 1000)], set()),
     "dnw_narrow": ([("dnw", 0, 0, 3670, 20000)], {"dnw.w"}),
+    # mtop.v4.array: v4 at the minimum pitch (0.36 + 0.48) under m4 and mtop; full arrays
+    # pass, and a cluster that is not a full rectangle of at least 2 x 2 fails, including
+    # those at least two cuts wide everywhere (caught by the maxrect check only)
+    **{name: (_v4_array(cells), want) for name, cells, want in (
+        ("v4_2x3", _cells(2, 3), set()),
+        ("v4_3x3", _cells(3, 3), set()),
+        ("v4_row3", _cells(3, 1), {"mtop.v4.array"}),
+        ("v4_l3", [(0, 0), (1, 0), (0, 1)], {"mtop.v4.array"}),
+        ("v4_3x3_corner", [p for p in _cells(3, 3) if p != (2, 2)], {"mtop.v4.array"}),
+        ("v4_3x3_hole", [p for p in _cells(3, 3) if p != (1, 1)], {"mtop.v4.array"}),
+        ("v4_l10", [*_cells(4, 2), (0, 2), (1, 2)], {"mtop.v4.array"}))},
 }
 
 
@@ -424,5 +549,58 @@ def test_magic_probes(sandbox, work, process):
     counts, whys = _results(_magic(sandbox, work, _drc_script(list(MAGIC_PROBES))))
     assert set(counts) == set(MAGIC_PROBES)
     wrong = {name: sorted(whys[name]) for name, (_, want) in MAGIC_PROBES.items()
+             if whys[name] != want}
+    assert not wrong
+
+
+# The partial grid check (grid is KLayout-only): (polygons of the top cell, polygons of a
+# subcell or None, the subcell's placement, the rule ids Magic reports). KLayout reports
+# grid on each; Magic only where an orthogonal edge is off the grid in its own cell.
+GRID_PROBES = {
+    # an orthogonal edge 2 nm off the grid: flagged
+    "grid_edge": ([("m1", [(0, 0), (2002, 0), (2002, 2000), (0, 2000)])], None, None,
+                  {"grid"}),
+    # the only off-grid vertices end a 45 degree edge, every orthogonal edge on a grid line
+    "grid_45_ends": ([("m1", [(0, 0), (3000, 0), (3000, 2000), (1002, 2000), (0, 998)])],
+                     None, None, set()),
+    # an on-grid m1 box in a subcell placed 2 nm off the grid: Magic checks each cell in its
+    # own coordinates (KLayout: grid x 4)
+    "grid_instance": ([], [("m1", [(0, 0), (2000, 0), (2000, 2000), (0, 2000)])], (2, 0),
+                      set()),
+    # an edge at about 30 degrees, vertices on the grid (KLayout: angle, no grid): no grid
+    "grid_other_angle": ([("m1", [(0, 0), (6000, 0), (6000, 4000), (3465, 4000), (0, 2000)])],
+                         None, None, set()),
+    # the same with its upper end 2 nm off the grid (KLayout: angle and grid): missed, as
+    # at the ends of a 45 degree edge (the vertex's orthogonal edge lies on a grid line)
+    "grid_other_angle_off": ([("m1", [(0, 0), (6000, 0), (6000, 4000), (3467, 4000),
+                                      (0, 2000)])], None, None, set()),
+}
+
+
+def _grid_gds(path: Path, process, cell: str, top, sub, at) -> None:
+    layout = kdb.Layout()
+    layout.dbu = 0.001
+    top_cell = layout.create_cell(cell)
+    for target, polygons in ((top_cell, top), (layout.create_cell(f"{cell}_c"), sub or [])):
+        for name, points in polygons:
+            target.shapes(layout.layer(*process.layers[name].gds)).insert(
+                kdb.Polygon([kdb.Point(x, y) for x, y in points]))
+    if sub:
+        child = layout.cell(f"{cell}_c")
+        top_cell.insert(kdb.CellInstArray(child.cell_index(), kdb.Trans(*at)))
+    else:
+        layout.delete_cell(layout.cell(f"{cell}_c").cell_index())
+    options = kdb.SaveLayoutOptions()
+    options.gds2_write_timestamps = False
+    layout.write(str(path), options)
+
+
+@pytest.mark.sandbox
+def test_grid_partial_check(sandbox, work, process):
+    for name, (top, sub, at, _) in GRID_PROBES.items():
+        _grid_gds(work / f"{name}.gds", process, name, top, sub, at)
+    counts, whys = _results(_magic(sandbox, work, _drc_script(list(GRID_PROBES))))
+    assert set(counts) == set(GRID_PROBES)
+    wrong = {name: sorted(whys[name]) for name, (*_, want) in GRID_PROBES.items()
              if whys[name] != want}
     assert not wrong

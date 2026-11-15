@@ -60,7 +60,8 @@ def tables() -> str:
                   [[f"`{rid}/{name}`", _markers(m)]
                    for (rid, name), m in sorted(EXPECTED_MARKERS.items())])
 
-    out += ["", f"### Magic exceptions (`MAGIC_EXCEPTIONS`, {len(MAGIC_EXCEPTIONS)} fixtures)",
+    n = len(MAGIC_EXCEPTIONS)
+    out += ["", f"### Magic exceptions (`MAGIC_EXCEPTIONS`, {n} fixture{'' if n == 1 else 's'})",
             ""]
     out += _table(["Fail fixture", "Rule ids Magic reports", "Reason"],
                   [[f"`{rid}/{name}`", _markers(e.expected) or "none (own rule missed)",

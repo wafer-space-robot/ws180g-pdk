@@ -61,29 +61,37 @@ build ran the same fixtures again (`tmp/t23/build1.log`): `klayout: 261 fixtures
 with `"wrong": {}` in both `reports/klayout-fixtures.json` and
 `reports/magic-fixtures.json` of the output tree.
 
-**After Phase 0 (2026-11-16): Magic checks `co.s.butt`, `grid` and `mtop.v4.array`.** The
-figures above describe the gate run. Since then Magic checks three of the eight rules that
-were KLayout-only: `co.s.butt` (two `edge4way` rules across the nd/pd butting edge),
-`grid` (one `off_grid` rule per GDS layer) and `mtop.v4.array` (CIF checks of the merged
-v4 clusters: `cifwidth` and a `maxrect` rectangle test); the comments of the generated
-technology describe each. Five rules stay KLayout-only (table below). The fail fixture
-`grid/fail_grid_45` was added: an m1 whose only off-grid vertices are the two ends of a
-45 degree edge, which KLayout reports and Magic's `off_grid` misses (a new
-`MAGIC_EXCEPTIONS` entry); the two `v4.size` exceptions are gone, as Magic now reports
-`mtop.v4.array` there too. `uv run pytest tests/rules tests/tech -rs -v -m sandbox` (log
-`tmp/v4-sandbox.log` of that branch, exit 0) gave `774 passed, 24 skipped`, counted per
-file with `tools/pytest_log_counts.py`:
+**After Phase 0 (2026-11-16): Magic checks `co.s.butt` and `mtop.v4.array`.** The figures
+above describe the gate run. Since then Magic checks two of the eight rules that were
+KLayout-only: `co.s.butt` (two `edge4way` rules across the nd/pd butting edge, extended
+past its ends by the value as a square, `manhattan_dist`) and `mtop.v4.array` (CIF checks
+of the merged v4 clusters: `cifwidth` and a `maxrect` rectangle test); the comments of the
+generated technology describe each. Six rules stay KLayout-only (table below). `grid` is
+one of them: the technology keeps one `off_grid` rule per GDS layer as a partial check, but
+Magic misses the off-grid ends of a 45 degree (or other non-orthogonal) edge and an
+off-grid cell placement, so the engines would not agree on every fixture. New fixtures:
+`grid/fail_grid_45` (an m1 whose only off-grid vertices end a 45 degree edge; KLayout
+only), and `co.s.butt/fail_corner` and `co.s.butt/pass_corner` (a cut diagonal to the end
+of the butting edges, 0.16 and 0.165 um from it in x and y). `MAGIC_EXCEPTIONS` is down to
+one: the two `v4.size` entries are gone, as Magic now reports `mtop.v4.array` there too.
+`uv run pytest tests/rules tests/tech -rs -v -m sandbox` (log `tmp/fix1/sandbox-final2.log`
+of that branch, exit 0) gave `773 passed, 32 skipped, 199 deselected` (the KLayout results from its cache, Magic
+run afresh), counted per file with
+`tools/pytest_log_counts.py`:
 
 | Test file | Passed | Skipped | Failed |
 |---|---|---|---|
-| `test_klayout_fixtures.py` (262 fixtures and 3 deck tests) | 265 | 0 | 0 |
-| `test_magic_fixtures.py` | 251 | 12 | 0 |
-| `test_engines_agree.py` | 250 | 12 | 0 |
+| `test_klayout_fixtures.py` (264 fixture tests, plus 3 other tests in the file) | 267 | 0 | 0 |
+| `test_magic_fixtures.py` (248 fixtures and the cache test) | 249 | 16 | 0 |
+| `test_engines_agree.py` | 248 | 16 | 0 |
+| `test_klayout_deck.py`, `test_klayout_tech.py`, `test_magic_tech.py` (sandbox tests) | 9 | 0 | 0 |
 
-The 12 skipped fixtures per Magic file belong to the five KLayout-only rules: `angle` 2,
-`cut.ortho` 2, `mtop.w.long` 4, `nw.tap.dmax` 2, `ps.tap.dmax` 2. The agreement test
-printed the two recorded `MAGIC_EXCEPTIONS` cases (`po.x.df/fail_end_inside`,
-`grid/fail_grid_45`).
+267 + 249 + 248 + 9 = 773, the summary line's count. The 16 skipped fixtures per Magic file
+belong to the six KLayout-only rules: `angle` 2, `cut.ortho` 2, `grid` 4, `mtop.w.long` 4,
+`nw.tap.dmax` 2, `ps.tap.dmax` 2. The agreement test printed the one recorded
+`MAGIC_EXCEPTIONS` case (`po.x.df/fail_end_inside`). Gate check 2
+(`tests/precheck/test_fixture_retarget.py`, log `tmp/fix1/retarget-final.log`, exit 0) gave
+`459 passed`: the 456 cases above plus `co.s.butt/corner` at 9K, 11K and 30K.
 
 ## Gate check 2: every generic pass fixture, retargeted, passes the public GF180MCU deck
 
@@ -281,7 +289,7 @@ fixtures report per pair or per cut.
 | `v4.size/oversize` | `mtop.v4.array` × 4, `v4.size` × 1 |
 | `v4.size/rect` | `mtop.v4.array` × 4, `v4.size` × 1 |
 
-### Magic exceptions (`MAGIC_EXCEPTIONS`, 1 fixtures)
+### Magic exceptions (`MAGIC_EXCEPTIONS`, 1 fixture)
 
 | Fail fixture | Rule ids Magic reports | Reason |
 |---|---|---|
@@ -333,12 +341,11 @@ The deck runs with `-rd decks=all,-density,-dummy,-antenna`.
 
 The gate is met only with these deviations; each needs the owner's agreement.
 
-1. **"Both DRC engines pass every fixture"**: five rules are KLayout-only (the spec allows
-   this; eight at the Phase 0 gate, see the 2026-11-16 note under gate check 1), and 2
-   fixtures have a Magic marker set that differs from KLayout's (`MAGIC_EXCEPTIONS`; one of
-   them, `grid/grid_45`, a case Magic misses); 14 fail fixtures carry a forced marker set
-   other than one marker of their own rule (`EXPECTED_MARKERS`). Both lists are in the
-   tables above.
+1. **"Both DRC engines pass every fixture"**: six rules are KLayout-only (the spec allows
+   this; eight at the Phase 0 gate, see the 2026-11-16 note under gate check 1; `grid` has
+   a partial check in Magic), and 1 fixture has a Magic marker set that differs from
+   KLayout's (`MAGIC_EXCEPTIONS`); 14 fail fixtures carry a forced marker set other than one
+   marker of their own rule (`EXPECTED_MARKERS`). Both lists are in the tables above.
 2. **"Passes the public GF180MCU deck"**: the deck runs without its density, fill (dummy) and
    antenna rule decks, the five files in the last table (plan decision 7). They need a whole
    die with fill and routing, which come in Phase 1.

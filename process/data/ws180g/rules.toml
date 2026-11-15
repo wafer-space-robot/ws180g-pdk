@@ -385,7 +385,7 @@ evidence = ["gf180mcu-drm/CO.5a", "gf180mcu-drm/CO.5b", "scmos8/4.3/deep", "scmo
 margin = 1.2
 margin_achieved = 1.222
 fixture = "co_s_butt"
-engines = ["klayout"]
+engines = ["klayout", "magic"]
 note = "space from co to the nd/pd butting edge; GF CO.5a/CO.5b 0.1; S8 4.3 select overlap of contact 1.5 lambda 0.135 / 1 lambda 0.10 (the selects meet at the butting edge); 1.2 x 0.135 = 0.162, up to 0.165"
 
 [rules."co.in"]

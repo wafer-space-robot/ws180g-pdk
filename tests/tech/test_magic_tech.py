@@ -99,6 +99,16 @@ def test_pad_enclosure_is_a_cross_plane_surround(tech):
     assert re.search(r'^ *surround pad \*mtop 3000 absence_ok "mtop.e.pad', tech, re.MULTILINE)
 
 
+def test_co_s_butt_is_an_edge_rule_across_the_butting_edge(tech):
+    # from each nd/pd butting edge (non-contact diffusion on one side, any type of the other
+    # diffusion on the other), no contact within the value on the far side
+    nd = "ndiff,nsubdiff,rndiff,ntransistor"
+    pd = "pdiff,psubdiff,rpdiff,ptransistor"
+    for a, b in ((nd, "allpd"), (pd, "allnd")):
+        assert re.search(rf'^ *edge4way {a} {b} 165 ~\(allco\)/active 0 0 "co.s.butt: ',
+                         tech, re.MULTILINE), a
+
+
 def test_magic_markers(tmp):
     from ws180g_rules.fixtures import Fixture
 
@@ -380,6 +390,15 @@ MAGIC_PROBES: dict[str, tuple[list[tuple[str, int, int, int, int]], set[str]]] =
     "co_butt": ([("nw", -3000, -3000, 5000, 5000), ("pd", 0, 0, 1000, 1000),
                  ("nd", 1000, 0, 2000, 1000), ("co", 890, 390, 1110, 610),
                  ("m1", 500, 0, 1500, 1000)], {"co.no.butt"}),
+    # co.s.butt (0.165): a cut on either side of the butting edge closer than the value, or
+    # with an edge on it, and one at exactly the value
+    **{name: ([("nw", -3000, -3000, 5000, 5000), ("pd", 0, 0, 1000, 1000),
+               ("nd", 1000, 0, 2000, 1000), ("co", x, 390, x + 220, 610),
+               ("m1", x - 390, 0, x + 610, 1000)], want)
+       for name, x, want in (("co_near_butt_p", 700, {"co.s.butt"}),
+                             ("co_near_butt_n", 1080, {"co.s.butt"}),
+                             ("co_on_butt_edge", 780, {"co.s.butt"}),
+                             ("co_at_butt_space", 615, set()))},
     "co_straddle_df": ([("nd", 0, 0, 1000, 1000), ("co", 900, 300, 1120, 520),
                         ("m1", 500, 0, 1500, 1000)], {"co.in", "df.e.co"}),
     "co_df_close": ([("nd", 0, 0, 1000, 1000), ("co", 700, 300, 920, 520),

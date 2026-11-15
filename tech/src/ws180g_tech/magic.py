@@ -537,6 +537,20 @@ def _co_on_butt(row: RuleRow, t: _Tech) -> Emitted:
             [f"edge4way {_list(n)} {_list(p)} 1 0 0 0 {why(row)}"])
 
 
+def _co_s_butt(row: RuleRow, t: _Tech) -> Emitted:
+    _arity(row, 3)
+    v = nm(_value(row))
+    return (["space to the nd/pd butting edge: from every edge between a non-contact type of",
+             "one diffusion and any type of the other (a butting edge), no contact within the",
+             "value on the far side. A cut straddling the edge splits into an n- and a",
+             "p-contact type there; that edge has a contact on both sides, so it is left to",
+             "co.no.butt (KLayout excludes straddling cuts too). Approximation: the zone is",
+             "the edge's own rectangle (no corner extension), so a cut diagonally beyond the",
+             "end of a butting edge is not measured (KLayout's zone is square there)"],
+            [f"edge4way {_list(_minus(nd, CO))} {_list(pd)} {v} {_not(CO, 'active')} 0 0 "
+             f"{why(row)}" for nd, pd in ((ND, PD), (PD, ND))])
+
+
 def _sab_on_gate(row: RuleRow, t: _Tech) -> Emitted:
     _arity(row, 2)
     t.templayer("sab", "sab", ["sab"])
@@ -600,8 +614,8 @@ MAGIC_KINDS: dict[str, MagicKind] = {
     "topology:co_on_butt": MagicKind("edge4way <n contacts> <p contacts> 1 0 0 0", _co_on_butt),
     "topology:sab_on_gate": MagicKind("CIF: cifmaxwidth (sab and allgate) 0", _sab_on_gate),
     "topology:co_s_butt": MagicKind(
-        "KLayout-only: KLayout-only in the rule table since Task 7; a space to the nd/pd "
-        "butting edge (an edge, not a layer) is not attempted in Magic in Phase 0"),
+        "edge4way <non-contact nd> allpd <v> ~(allco) 0 0, and the same from pd to allnd",
+        _co_s_butt),
     "topology:v4_array": MagicKind("KLayout-only: Magic cannot count the cuts of a cluster"),
     "topology:grid": MagicKind(
         "KLayout-only: KLayout-only in the rule table since Task 7; Magic's off_grid rule "

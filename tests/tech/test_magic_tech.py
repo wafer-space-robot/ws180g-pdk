@@ -109,6 +109,25 @@ def test_co_s_butt_is_an_edge_rule_across_the_butting_edge(tech):
                          tech, re.MULTILINE), a
 
 
+def test_grid_is_an_off_grid_rule_per_layer(tech, process):
+    # one off_grid rule per drawn or generated GDS layer over the types written to it, so
+    # the edges between types of one layer (the 1 nm unsilicided cores, cut images in their
+    # metal) are not checked, and those of every layer are
+    drc = _section(tech, "drc")
+    rules = re.findall(r'^ *off_grid (\S+) 5 "grid: (\S+) ', drc, re.MULTILINE)
+    from ws180g_tech.klayout import selected_layers
+
+    layers = [n for n, layer in selected_layers(process, VARIANT).items()
+              if layer.kind in ("drawn", "generated")]
+    assert len(rules) == len(layers) and {name for _, name in rules} == set(layers)
+    by_layer = {name: types for types, name in rules}
+    assert by_layer["nd"] == "allnd" and by_layer["m1"] == "*m1" and by_layer["v4"] == "via4"
+    assert by_layer["nw"] == "nwell" and by_layer["sab"] == "sab"
+    # off_grid checks the edges of tiles, not the ends of a 45 degree edge: a known gap
+    missed = MAGIC_EXCEPTIONS[("grid", "grid_45")]
+    assert missed.own_id_missed and missed.expected == frozenset()
+
+
 def test_magic_markers(tmp):
     from ws180g_rules.fixtures import Fixture
 
@@ -213,9 +232,9 @@ def test_cif_checks_have_their_style(tech):
 
 
 def test_a_magic_row_that_magic_cannot_check_raises(table, process, tmp):
-    rows = [dataclasses.replace(r, engines=["klayout", "magic"]) if r.id == "grid" else r
+    rows = [dataclasses.replace(r, engines=["klayout", "magic"]) if r.id == "angle" else r
             for r in table.rows]
-    with pytest.raises(ValueError, match="grid"):
+    with pytest.raises(ValueError, match="angle"):
         write_magic_tech(dataclasses.replace(table, rows=rows), process, VARIANT, tmp / "x")
 
 

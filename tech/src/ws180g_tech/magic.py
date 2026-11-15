@@ -241,6 +241,7 @@ class _Tech:
 
     process: Process
     widths: dict[str, int]
+    layers: dict = field(default_factory=dict)  # the variant's layers (selected_layers)
     cif: list[str] = field(default_factory=list)
     cif_names: set[str] = field(default_factory=set)
 
@@ -551,6 +552,27 @@ def _co_s_butt(row: RuleRow, t: _Tech) -> Emitted:
              f"{why(row)}" for nd, pd in ((ND, PD), (PD, ND))])
 
 
+def _grid(row: RuleRow, t: _Tech) -> Emitted:
+    _arity(row, 0)
+    grid = t.process.grid.value
+    g = nm(grid)
+    rules = [(f'off_grid {_list(OUTPUT.get(name, [name]))} {g} '
+              f'"{row.id}: {name} edge off the {_num(grid)} um grid"')
+             for name, layer in t.layers.items() if layer.kind in ("drawn", "generated")]
+    return ([f"off-grid edges: one off_grid rule (grid {g} nm) per drawn or generated GDS layer",
+             "over the types it is written from (cifoutput style gds), so an edge of the",
+             "layer off the grid is an error and the edges between types of one layer (the",
+             "1 nm unsilicided cores of the sab types, cut images inside their metal) are",
+             "not checked. GDS is read at 1 nm per internal unit (cifinput scalefactor 1",
+             "nanometers); layergen, which every checked layout passes through, works at a",
+             "1 nm database unit, so gds read keeps each coordinate as drawn (a finer unit",
+             "makes Magic rescale its grid, and the rule's pitch with it). Approximation:",
+             "Magic checks the orthogonal edges, KLayout the vertices; an off-grid vertex",
+             "whose orthogonal edges all lie on grid lines (the ends of a 45 degree edge) is",
+             "missed (MAGIC_EXCEPTIONS grid/grid_45)"],
+            rules)
+
+
 def _sab_on_gate(row: RuleRow, t: _Tech) -> Emitted:
     _arity(row, 2)
     t.templayer("sab", "sab", ["sab"])
@@ -617,9 +639,7 @@ MAGIC_KINDS: dict[str, MagicKind] = {
         "edge4way <non-contact nd> allpd <v> ~(allco) 0 0, and the same from pd to allnd",
         _co_s_butt),
     "topology:v4_array": MagicKind("KLayout-only: Magic cannot count the cuts of a cluster"),
-    "topology:grid": MagicKind(
-        "KLayout-only: KLayout-only in the rule table since Task 7; Magic's off_grid rule "
-        "is not attempted in Phase 0"),
+    "topology:grid": MagicKind("off_grid <types of the GDS layer> <grid> per layer", _grid),
     "topology:angle": MagicKind(
         "KLayout-only: Magic stores only Manhattan and 45-degree geometry"),
     "topology:cut_ortho": MagicKind(
@@ -639,6 +659,14 @@ class MagicException:
 
 
 MAGIC_EXCEPTIONS: dict[tuple[str, str], MagicException] = {
+    ("grid", "grid_45"): MagicException(
+        frozenset(),
+        "the only off-grid vertices are the two ends of a 45 degree edge, and every "
+        "orthogonal edge lies on a grid line: Magic's off_grid rule checks the position of "
+        "each orthogonal edge between a layer's types and the others, and Magic stores the "
+        "45 degree edge as a split tile whose off-grid corners lie on tile boundaries "
+        "inside the layer, which no rule sees",
+        own_id_missed=True),
     ("po.x.df", "end_inside"): MagicException(
         frozenset({"po.x.df", "df.x.po"}),
         "po ends inside df: Magic finds it (the corner rule of po.x.df), but the gate's end "
@@ -765,7 +793,7 @@ def tech_text(table: RuleTable, process: Process, variant: str) -> str:
     layers = selected_layers(process, variant)
     widths = {str(r.layers[0]): nm(r.value) for r in table.rows
               if r.kind == "min-width" and r.condition is None and len(r.layers) == 1}
-    t = _Tech(process, widths)
+    t = _Tech(process, widths, layers)
     drc = _drc(table, t)  # first: it defines the CIF layers of the drc style
     planes = _planes(process, variant)
     return "\n".join([

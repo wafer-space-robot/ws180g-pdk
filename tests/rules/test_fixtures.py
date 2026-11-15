@@ -253,6 +253,23 @@ def test_expected_markers(fixtures):
     assert by_key[("nw.w", "pass", "min")].markers() == {}
     assert by_key[("nw.w", "fail", "min_minus_grid")].markers() == {"nw.w": 1}
     assert by_key[("grid", "fail", "grid")].markers() == {"grid": 2}
+    assert by_key[("grid", "fail", "grid_45")].markers() == {"grid": 2}
+
+
+def test_grid_fail_fixture_with_off_grid_45_degree_edge(fixtures, proc):
+    """The grid rule's `grid_45` fail fixture: an m1 polygon whose only off-grid vertices
+    are the two ends of its 45 degree edge (every orthogonal edge lies on a grid line), the
+    case Magic's off_grid rule misses (MAGIC_EXCEPTIONS)."""
+    f = _get(fixtures, "grid", "fail", "grid_45")
+    m1 = _layers(f.path, proc)["m1"]
+    diagonal = [e for e in m1.edges() if e.dx() and e.dy()]
+    assert len(diagonal) == 1 and abs(diagonal[0].dx()) == abs(diagonal[0].dy())
+    assert all(p.x % GRID or p.y % GRID for p in (diagonal[0].p1, diagonal[0].p2))
+    for e in m1.edges():
+        if e.dx() == 0:
+            assert e.p1.x % GRID == 0, e
+        elif e.dy() == 0:
+            assert e.p1.y % GRID == 0, e
 
 
 def test_pass_fixture_v4_clusters_are_rectangular_arrays(fixtures, proc):

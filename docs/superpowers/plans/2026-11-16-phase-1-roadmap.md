@@ -74,7 +74,7 @@ wave 6   1D cards final, cells re-characterised by the build, then 1K tiles
 
 Items on one line separated by spaces are independent; "then" marks a dependency inside a
 wave. Waves 4 and 5 assume development cards (decision 5); if that is refused, the
-characterisation part of 1G, and 1I, move behind 1D. Reasons for this order:
+characterisation part of 1G, then 1I and 1J part 2, move behind 1D. Reasons for this order:
 
 - **1A first.** The Phase 0 report lists three deviations from the gate wording. 1A removes
   two of them (the GF180MCU deck run without its density, dummy and antenna decks; the `dnw`

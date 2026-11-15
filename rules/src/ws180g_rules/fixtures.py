@@ -634,11 +634,13 @@ def _co_s_butt(row: RuleRow, k: Kit) -> list[Case]:
     # beyond the end of the butting edges: an L of nd round the corner (0, 1200) of a pd,
     # the cut in the nd diagonal to that corner, `d` from it in x and in y; KLayout's zone is
     # each edge extended by the value, a square beyond the end, so the fail case is one grid
-    # step under the value in both directions (a Euclidean corner would pass it)
+    # step under the value in both directions (a Euclidean corner would pass it). The nd
+    # arm over the pd ends flush with the pd (x = 1500): an arm reaching past it would have
+    # the pd's psel overhang under its bottom edge, where GF NP.5b wants Nplus
     for expect, d in (("fail", v - k.g), ("pass", v)):
         c = Cell()
         c.box("pd", 0, 0, 1500, 1200)
-        c.polygon("nd", [(-2 * UM, 0), (0, 0), (0, 1200), (2 * UM, 1200), (2 * UM, 3 * UM),
+        c.polygon("nd", [(-2 * UM, 0), (0, 0), (0, 1200), (1500, 1200), (1500, 3 * UM),
                          (-2 * UM, 3 * UM)])
         cut(c, k, "co", -d - a, 1200 + d)
         cases.append((expect, "corner", c))

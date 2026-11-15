@@ -552,6 +552,37 @@ def _co_s_butt(row: RuleRow, t: _Tech) -> Emitted:
              f"{why(row)}" for nd, pd in ((ND, PD), (PD, ND))])
 
 
+def _v4_array(row: RuleRow, t: _Tech) -> Emitted:
+    _arity(row, 2)
+    name = str(row.layers[1])
+    (cut,) = _types(row, 1)
+    size, space = nm(t.value(f"rules.{name}.size")), nm(t.value(f"rules.{name}.s"))
+    if space % 2:
+        raise ValueError(f"{row.id}: rules.{name}.s ({space} nm) is not an even number of nm")
+    clusters = t.templayer(f"{name}_clusters", f"{name} clusters: the cuts grown by half of "
+                           f"rules.{name}.s, so the cuts of an array at up to the minimum "
+                           "space merge into one region", [cut, f"grow {space // 2}"])
+    rect = t.templayer(f"{name}_cluster_rect", f"the largest rectangle inside each {name} "
+                       "cluster", [clusters, "maxrect"])
+    rest = t.templayer(f"{name}_cluster_not_rect", f"the parts of each {name} cluster "
+                       "outside its largest rectangle: empty only for a rectangular cluster",
+                       [clusters, f"and-not {rect}"])
+    return ([f"CIF check of the {name} arrays (as the KLayout check): the cuts grown by half",
+             f"of rules.{name}.s merge into one cluster per array; a cluster narrower than",
+             f"2 x rules.{name}.size + rules.{name}.s ({2 * size + space} nm) in either",
+             "direction (a lone cut, a single row or column, an arm one cut wide) or that is",
+             "not its own largest inscribed rectangle (maxrect: a missing cut, a hole, a",
+             "staggered row, an odd-sized cut) is an error. Every cut is a",
+             f"rules.{name}.size square at least rules.{name}.s from the next, so a",
+             "rectangular cluster at least two cuts wide is a full rows x columns array of",
+             "at least 2 x 2 (GF180MCU MT30.8b). Approximation: every via4 is checked (it is",
+             "a contact to mtop by construction; KLayout takes the v4 interacting mtop), and",
+             "a cluster of fewer than 4 cuts that are each oversized to a 1.2 um wide",
+             f"rectangle is left to {name}.size (KLayout also counts the cuts)"],
+            [f"cifwidth {clusters} {2 * size + space} {why(row)}",
+             f"cifmaxwidth {rest} 0 bend_illegal {why(row)}"])
+
+
 def _grid(row: RuleRow, t: _Tech) -> Emitted:
     _arity(row, 0)
     grid = t.process.grid.value
@@ -638,7 +669,9 @@ MAGIC_KINDS: dict[str, MagicKind] = {
     "topology:co_s_butt": MagicKind(
         "edge4way <non-contact nd> allpd <v> ~(allco) 0 0, and the same from pd to allnd",
         _co_s_butt),
-    "topology:v4_array": MagicKind("KLayout-only: Magic cannot count the cuts of a cluster"),
+    "topology:v4_array": MagicKind(
+        "CIF: cifwidth <cuts grown by v4.s / 2> <2 x v4.size + v4.s> and cifmaxwidth "
+        "(<clusters> and-not <their maxrect>) 0", _v4_array),
     "topology:grid": MagicKind("off_grid <types of the GDS layer> <grid> per layer", _grid),
     "topology:angle": MagicKind(
         "KLayout-only: Magic stores only Manhattan and 45-degree geometry"),
@@ -673,12 +706,6 @@ MAGIC_EXCEPTIONS: dict[tuple[str, str], MagicException] = {
         "edge borders diffusion like a source/drain edge, so df.x.po also measures the "
         "diffusion beyond the poly end against its 0.48 um; an edge rule cannot tell the "
         "two apart and cannot withdraw another rule's error"),
-    **{("v4.size", name): MagicException(
-        frozenset({"v4.size"}),
-        "a v4 one grid step larger than the others of its 2 x 2 array breaks the array's "
-        "rectangle, so KLayout also reports mtop.v4.array (Task 18); that rule is KLayout-only "
-        "(Magic cannot count the cuts of a cluster), so Magic reports v4.size alone")
-       for name in ("oversize", "rect")},
 }
 
 

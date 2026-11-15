@@ -128,6 +128,24 @@ def test_grid_is_an_off_grid_rule_per_layer(tech, process):
     assert missed.own_id_missed and missed.expected == frozenset()
 
 
+def test_v4_array_is_a_cif_check_of_the_merged_clusters(tech):
+    # the cuts grown by half of rules.v4.s merge into one cluster per array; a cluster
+    # narrower than 2 x rules.v4.size + rules.v4.s (1.2 um) or other than its largest
+    # inscribed rectangle (maxrect) is an error
+    cifout = _section(tech, "cifoutput")
+    assert re.search(r"^ *templayer c_v4_clusters via4\n *grow 240$", cifout, re.MULTILINE)
+    assert re.search(r"^ *templayer c_v4_cluster_rect c_v4_clusters\n *maxrect$", cifout,
+                     re.MULTILINE)
+    assert re.search(r"^ *templayer c_v4_cluster_not_rect c_v4_clusters\n"
+                     r" *and-not c_v4_cluster_rect$", cifout, re.MULTILINE)
+    drc = _section(tech, "drc")
+    assert re.search(r'^ *cifwidth c_v4_clusters 1200 "mtop.v4.array: ', drc, re.MULTILINE)
+    assert re.search(r'^ *cifmaxwidth c_v4_cluster_not_rect 0 bend_illegal "mtop.v4.array: ',
+                     drc, re.MULTILINE)
+    # Magic now reports mtop.v4.array with v4.size on an odd-sized cut, as KLayout does
+    assert not {k for k in MAGIC_EXCEPTIONS if k[0] == "v4.size"}
+
+
 def test_magic_markers(tmp):
     from ws180g_rules.fixtures import Fixture
 
@@ -342,6 +360,19 @@ def test_drc_passes_a_legal_transistor_and_flags_narrow_poly(sandbox, work, proc
     assert counts.get("narrow", 0) >= 1 and "po.w" in whys["narrow"], out
 
 
+def _cells(cols: int, rows: int) -> list[tuple[int, int]]:
+    return [(c, r) for c in range(cols) for r in range(rows)]
+
+
+def _v4_array(cells: list[tuple[int, int]]) -> list[tuple[str, int, int, int, int]]:
+    """v4 cuts (0.36 um) at (column, row) of a grid at the minimum space (0.48 um), under
+    an m4 and an mtop plate that enclose them all."""
+    pitch = 360 + 480
+    plate = [("m4", -2000, -2000, 6000, 6000), ("mtop", -2000, -2000, 6000, 6000)]
+    return [*plate, *(("v4", c * pitch, r * pitch, c * pitch + 360, r * pitch + 360)
+                      for c, r in cells)]
+
+
 # Probes: (boxes in dbu, the exact set of rule ids Magic reports). The first group is the
 # KLayout deck's review probes (tests/rules/test_klayout_deck.py) with the ids KLayout
 # reports on them; "differs" marks the documented approximations of the Magic rules, where
@@ -452,6 +483,17 @@ MAGIC_PROBES: dict[str, tuple[list[tuple[str, int, int, int, int]], set[str]]] =
     "df_np_near": ([("nd", 0, 0, 1000, 1000), ("pd", 1450, 0, 2450, 1000)], {"df.s.np"}),
     "df_np_butted": ([("pd", 1000, 0, 2000, 1000), ("nd", 0, 0, 1000, 1000)], set()),
     "dnw_narrow": ([("dnw", 0, 0, 3670, 20000)], {"dnw.w"}),
+    # mtop.v4.array: v4 at the minimum pitch (0.36 + 0.48) under m4 and mtop; full arrays
+    # pass, and a cluster that is not a full rectangle of at least 2 x 2 fails, including
+    # those at least two cuts wide everywhere (caught by the maxrect check only)
+    **{name: (_v4_array(cells), want) for name, cells, want in (
+        ("v4_2x3", _cells(2, 3), set()),
+        ("v4_3x3", _cells(3, 3), set()),
+        ("v4_row3", _cells(3, 1), {"mtop.v4.array"}),
+        ("v4_l3", [(0, 0), (1, 0), (0, 1)], {"mtop.v4.array"}),
+        ("v4_3x3_corner", [p for p in _cells(3, 3) if p != (2, 2)], {"mtop.v4.array"}),
+        ("v4_3x3_hole", [p for p in _cells(3, 3) if p != (1, 1)], {"mtop.v4.array"}),
+        ("v4_l10", [*_cells(4, 2), (0, 2), (1, 2)], {"mtop.v4.array"}))},
 }
 
 

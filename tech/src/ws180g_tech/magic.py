@@ -18,8 +18,9 @@ one Magic plane cannot overlap and cross-plane enclosure needs contact types:
   topology rules flag; `cifoutput` style `gds` is the inverse (each GDS layer is the union
   of its types);
 - `cifoutput` style `drc` holds the CIF layers of the checks Magic's edge rules cannot make
-  (flush and inside extension ends, shapes not interacting with sab, sab on a gate); the drc
-  section checks them with `cifmaxwidth <layer> 0` (any shape is an error) and `cifspacing`.
+  (flush and inside extension ends, shapes not interacting with sab, sab on a gate, the v4
+  array clusters); the drc section checks them with `cifmaxwidth <layer> 0` (any shape is an
+  error), `cifspacing` and `cifwidth`.
 
 The `drc` section has one block per rule with Magic among its `engines`, each Magic rule
 with `"<rule id>: ..."` as its why string and its distances in nanometres, and a comment on

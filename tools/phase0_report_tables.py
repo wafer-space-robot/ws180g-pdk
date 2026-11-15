@@ -63,7 +63,8 @@ def tables() -> str:
     out += ["", f"### Magic exceptions (`MAGIC_EXCEPTIONS`, {len(MAGIC_EXCEPTIONS)} fixtures)",
             ""]
     out += _table(["Fail fixture", "Rule ids Magic reports", "Reason"],
-                  [[f"`{rid}/{name}`", _markers(e.expected), e.reason]
+                  [[f"`{rid}/{name}`", _markers(e.expected) or "none (own rule missed)",
+                    e.reason]
                    for (rid, name), e in sorted(MAGIC_EXCEPTIONS.items())])
 
     table = RuleTable.from_process(load_process())

@@ -30,3 +30,4 @@ Working documents (on GitHub, not part of this build):
 
 - [Design document](https://github.com/wafer-space-robot/ws180g-pdk/blob/main/docs/superpowers/specs/2026-10-26-ws180g-pdk-design.md)
 - [Phase 0 plan: Foundations](https://github.com/wafer-space-robot/ws180g-pdk/blob/main/docs/superpowers/plans/2026-11-07-phase-0-foundations.md)
+- [Phase 1 roadmap (proposed)](https://github.com/wafer-space-robot/ws180g-pdk/blob/main/docs/superpowers/plans/2026-11-16-phase-1-roadmap.md)

@@ -296,7 +296,7 @@ fixtures report per pair or per cut.
 | `cut.ortho` | topology | Magic stores only Manhattan and 45-degree geometry |
 | `mtop.w.long` | min-width | Magic has no width rule conditional on the length of an edge |
 | `angle` | topology | Magic stores only Manhattan and 45-degree geometry |
-| `grid` | topology | (partial check in Magic) Magic's off_grid checks only the position of each orthogonal edge, in each cell's own coordinates, so it misses off-grid vertices at the ends of a 45-degree edge whose orthogonal edges lie on grid lines, and a cell instance placed off the grid (DRC runs in each cell's coordinates; the checked layout is not flattened); and non-Manhattan input at other angles is read as 1 nm staircases, which it flags as grid where KLayout reports angle. One off_grid rule per GDS layer stays as a partial check of the off-grid orthogonal edges per cell |
+| `grid` | topology | (partial check in Magic) Magic's off_grid checks only the position of each orthogonal edge, in each cell's own coordinates, so it misses off-grid vertices at the ends of a 45-degree edge, or of an edge at any other angle, whose orthogonal edges lie on grid lines, and a cell instance placed off the grid (DRC runs in each cell's coordinates; the checked layout is not flattened). An edge at another angle with its ends on the grid gets no grid error (probed: no 1 nm staircase is flagged; KLayout reports it under angle only). One off_grid rule per GDS layer stays as a partial check of the off-grid orthogonal edges per cell |
 
 ### Pass fixtures excluded from gate check 2 (`EXCLUDED`, 4 fixtures)
 

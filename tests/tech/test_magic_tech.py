@@ -122,7 +122,7 @@ def test_grid_is_klayout_only_with_a_partial_off_grid_check(tech, process, table
     kind = MAGIC_KINDS["topology:grid"]
     assert kind.emit is None and kind.partial is not None
     assert next(r for r in table.rows if r.id == "grid").engines == ["klayout"]
-    for gap in ("45-degree edge", "instance", "staircase", "angle"):
+    for gap in ("45-degree edge", "instance", "other angle", "no grid error"):
         assert gap in kind.rule, gap
     # the partial check: one off_grid rule per drawn or generated GDS layer over the types
     # written to it, so the edges between types of one layer (the 1 nm unsilicided cores,
@@ -567,10 +567,13 @@ GRID_PROBES = {
     # own coordinates (KLayout: grid x 4)
     "grid_instance": ([], [("m1", [(0, 0), (2000, 0), (2000, 2000), (0, 2000)])], (2, 0),
                       set()),
-    # an edge at about 30 degrees, vertices on the grid: Magic reads it as a 1 nm
-    # staircase, whose steps are off the grid (KLayout: angle, no grid)
-    "grid_staircase": ([("m1", [(0, 0), (6000, 0), (6000, 4000), (3465, 4000), (0, 2000)])],
-                       None, None, {"grid"}),
+    # an edge at about 30 degrees, vertices on the grid (KLayout: angle, no grid): no grid
+    "grid_other_angle": ([("m1", [(0, 0), (6000, 0), (6000, 4000), (3465, 4000), (0, 2000)])],
+                         None, None, set()),
+    # the same with its upper end 2 nm off the grid (KLayout: angle and grid): missed, as
+    # at the ends of a 45 degree edge (the vertex's orthogonal edge lies on a grid line)
+    "grid_other_angle_off": ([("m1", [(0, 0), (6000, 0), (6000, 4000), (3467, 4000),
+                                      (0, 2000)])], None, None, set()),
 }
 
 

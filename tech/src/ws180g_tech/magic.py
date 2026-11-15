@@ -628,10 +628,12 @@ def _grid(row: RuleRow, t: _Tech) -> Emitted:
              "1 nm database unit, so gds read keeps each coordinate as drawn (a finer unit",
              "makes Magic rescale its grid, and the rule's pitch with it). A partial check",
              "of a KLayout-only rule: Magic checks orthogonal edges in each cell's own",
-             "coordinates, KLayout the vertices of the flat layout, so it misses the ends of",
-             "a 45 degree edge and an off-grid cell placement, and it reports an edge at",
-             "another angle (read as 1 nm staircase steps) as grid where KLayout reports",
-             "angle (see the KLayout-only list above). Idiom: off_grid (Magic technology",
+             "coordinates, KLayout the vertices of the flat layout, so it misses an off-grid",
+             "end of a 45 degree edge or an edge at another angle (an end whose orthogonal",
+             "edge lies on a grid line) and an off-grid cell placement; on an edge at",
+             "another angle with its ends on the grid it reports no grid error, as KLayout",
+             "(probed: no 1 nm staircase double report; see the KLayout-only list above).",
+             "Idiom: off_grid (Magic technology",
              "manual, drc section, http://opencircuitdesign.com/magic/techref/maint2.html)"],
             rules)
 
@@ -715,11 +717,12 @@ MAGIC_KINDS: dict[str, MagicKind] = {
     "topology:grid": MagicKind(
         "KLayout-only: Magic's off_grid checks only the position of each orthogonal edge, "
         "in each cell's own coordinates, so it misses off-grid vertices at the ends of a "
-        "45-degree edge whose orthogonal edges lie on grid lines, and a cell instance "
-        "placed off the grid (DRC runs in each cell's coordinates; the checked layout is "
-        "not flattened); and non-Manhattan input at other angles is read as 1 nm "
-        "staircases, which it flags as grid where KLayout reports angle. One off_grid rule "
-        "per GDS layer stays as a partial check of the off-grid orthogonal edges per cell",
+        "45-degree edge, or of an edge at any other angle, whose orthogonal edges lie on "
+        "grid lines, and a cell instance placed off the grid (DRC runs in each cell's "
+        "coordinates; the checked layout is not flattened). An edge at another angle with "
+        "its ends on the grid gets no grid error (probed: no 1 nm staircase is flagged; "
+        "KLayout reports it under angle only). One off_grid rule per GDS layer stays as a "
+        "partial check of the off-grid orthogonal edges per cell",
         partial=_grid),
     "topology:angle": MagicKind(
         "KLayout-only: Magic stores only Manhattan and 45-degree geometry"),

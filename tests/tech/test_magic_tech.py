@@ -101,12 +101,14 @@ def test_pad_enclosure_is_a_cross_plane_surround(tech):
 
 def test_co_s_butt_is_an_edge_rule_across_the_butting_edge(tech):
     # from each nd/pd butting edge (non-contact diffusion on one side, any type of the other
-    # diffusion on the other), no contact within the value on the far side
+    # diffusion on the other), no contact within the value on the far side; the zone goes on
+    # past an end of the edge by the value where the first diffusion stops there, as a
+    # square (manhattan_dist; KLayout extends the edge by the value)
     nd = "ndiff,nsubdiff,rndiff,ntransistor"
     pd = "pdiff,psubdiff,rpdiff,ptransistor"
-    for a, b in ((nd, "allpd"), (pd, "allnd")):
-        assert re.search(rf'^ *edge4way {a} {b} 165 ~\(allco\)/active 0 0 "co.s.butt: ',
-                         tech, re.MULTILINE), a
+    for a, b, own in ((nd, "allpd", "allnd"), (pd, "allnd", "allpd")):
+        assert re.search(rf'^ *edge4way {a} {b} 165 ~\(allco\)/active ~\({own}\)/active 165 '
+                         'manhattan_dist "co.s.butt: ', tech, re.MULTILINE), a
 
 
 def test_grid_is_an_off_grid_rule_per_layer(tech, process):
@@ -449,6 +451,23 @@ MAGIC_PROBES: dict[str, tuple[list[tuple[str, int, int, int, int]], set[str]]] =
                              ("co_near_butt_n", 1080, {"co.s.butt"}),
                              ("co_on_butt_edge", 780, {"co.s.butt"}),
                              ("co_at_butt_space", 615, set()))},
+    # co.s.butt beyond the ends of the butting edges: an L of nd round the corner of a pd
+    # (the edges x = 0 and y = 1200 end at (0, 1200)); a cut in the nd diagonal to that end,
+    # dx and dy from it. KLayout's zone is the edge extended by the value (a square beyond
+    # the end), so the cut is too close when both are under the value
+    **{name: ([("pd", 0, 0, 1500, 1200), ("nd", -2000, 0, 0, 3000), ("nd", 0, 1200, 2000, 3000),
+               ("co", -dx - 220, 1200 + dy, -dx, 1420 + dy),
+               ("m1", -dx - 620, 800 + dy, -dx + 400, 1820 + dy)], want)
+       for name, dx, dy, want in (("butt_corner", 100, 100, {"co.s.butt"}),
+                                  ("butt_corner_160", 100, 160, {"co.s.butt"}),
+                                  ("butt_corner_150", 150, 150, {"co.s.butt"}),
+                                  ("butt_corner_165", 100, 165, set()),
+                                  ("butt_corner_far", 165, 165, set()))},
+    # the reviewer's probe: nd taller than pd (the vertical butting edge ends at y = 1200),
+    # a cut 100 nm from the end in x and y; df.e.co too (the nd ends 0.1 um from the cut)
+    "butt_end_tall_nd": ([("pd", 0, 0, 1500, 1200), ("nd", -2000, 0, 0, 3000),
+                          ("co", -320, 1300, -100, 1520), ("m1", -720, 900, 300, 1920)],
+                         {"co.s.butt", "df.e.co"}),
     "co_straddle_df": ([("nd", 0, 0, 1000, 1000), ("co", 900, 300, 1120, 520),
                         ("m1", 500, 0, 1500, 1000)], {"co.in", "df.e.co"}),
     "co_df_close": ([("nd", 0, 0, 1000, 1000), ("co", 700, 300, 920, 520),

@@ -546,11 +546,20 @@ def _co_s_butt(row: RuleRow, t: _Tech) -> Emitted:
              "one diffusion and any type of the other (a butting edge), no contact within the",
              "value on the far side. A cut straddling the edge splits into an n- and a",
              "p-contact type there; that edge has a contact on both sides, so it is left to",
-             "co.no.butt (KLayout excludes straddling cuts too). Approximation: the zone is",
-             "the edge's own rectangle (no corner extension), so a cut diagonally beyond the",
-             "end of a butting edge is not measured (KLayout's zone is square there)"],
-            [f"edge4way {_list(_minus(nd, CO))} {_list(pd)} {v} {_not(CO, 'active')} 0 0 "
-             f"{why(row)}" for nd, pd in ((ND, PD), (PD, ND))])
+             "co.no.butt (KLayout excludes straddling cuts too). Past an end of the edge",
+             "where the first diffusion stops (corner types: not that diffusion), the zone",
+             "goes on by the value (corner distance), a square beyond the end as KLayout's",
+             "edge extended by the value (manhattan_dist: without it, `drc euclidean on`",
+             "rounds that corner and a cut 0.1 um by 0.16 um from the end passes); where the",
+             "edge stops at a contact of the first diffusion it does not (that contact",
+             "straddles, or touches, the edge). Idioms: edge4way with corner types and",
+             "distance (Magic technology manual, drc section,",
+             "http://opencircuitdesign.com/magic/techref/maint2.html); manhattan_dist as in",
+             "the IHP-Open-PDK Magic drc rules (ihp-sg13g2/libs.tech/magic/ihp-sg13g2-drc.tech,",
+             "https://github.com/IHP-GmbH/IHP-Open-PDK, Apache-2.0)"],
+            [f"edge4way {_list(_minus(nd, CO))} {_list(pd)} {v} {_not(CO, 'active')} "
+             f"{_not(nd, 'active')} {v} manhattan_dist {why(row)}"
+             for nd, pd in ((ND, PD), (PD, ND))])
 
 
 def _v4_array(row: RuleRow, t: _Tech) -> Emitted:

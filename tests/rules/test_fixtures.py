@@ -272,6 +272,20 @@ def test_grid_fail_fixture_with_off_grid_45_degree_edge(fixtures, proc):
             assert e.p1.y % GRID == 0, e
 
 
+def test_co_s_butt_corner_fixtures(fixtures, proc):
+    """co.s.butt beyond the end of the butting edges: an L of nd round a pd corner, a cut in
+    the nd diagonal to the corner (0, 1200), 0.16 um from it in x and y (fail: KLayout's
+    zone is the edge extended by 0.165 um, a square beyond the end) or 0.165 um (pass)."""
+    for expect, d in (("fail", 160), ("pass", 165)):
+        f = _get(fixtures, "co.s.butt", expect, "corner")
+        assert f.markers() == ({"co.s.butt": 1} if expect == "fail" else {})
+        layers = _layers(f.path, proc)
+        (co,) = _boxes(layers["co"])
+        assert (co.right, co.bottom) == (-d, 1200 + d)
+        assert (layers["nd"] & layers["pd"]).is_empty()
+        assert _boxes(layers["pd"]) == [kdb.Box(0, 0, 1500, 1200)]
+
+
 def test_pass_fixture_v4_clusters_are_rectangular_arrays(fixtures, proc):
     """Every v4 cluster of a pass fixture is a rectangular array: GF180MCU MT30.8 (30K top
     metal) merges each cluster's cuts by 1 um over-under sizing and rejects a cluster whose

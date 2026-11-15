@@ -622,14 +622,26 @@ def _co_on_butt(row: RuleRow, k: Kit) -> list[Case]:
 
 def _co_s_butt(row: RuleRow, k: Kit) -> list[Case]:
     """A contact in the nd at `s` from the butting edge (the rule has a value, so the
-    three steps of a space)."""
+    three steps of a space), and the two `corner` cases beyond the end of the edges."""
     a = k.cut("co")
+    v = to_dbu(row.value)
     cases = []
-    for expect, name, s in _steps(to_dbu(row.value), k.g):
+    for expect, name, s in _steps(v, k.g):
         c = Cell()
         _butted(c)
         cut(c, k, "co", -s - a, 600 - a // 2)
         cases.append((expect, name, c))
+    # beyond the end of the butting edges: an L of nd round the corner (0, 1200) of a pd,
+    # the cut in the nd diagonal to that corner, `d` from it in x and in y; KLayout's zone is
+    # each edge extended by the value, a square beyond the end, so the fail case is one grid
+    # step under the value in both directions (a Euclidean corner would pass it)
+    for expect, d in (("fail", v - k.g), ("pass", v)):
+        c = Cell()
+        c.box("pd", 0, 0, 1500, 1200)
+        c.polygon("nd", [(-2 * UM, 0), (0, 0), (0, 1200), (2 * UM, 1200), (2 * UM, 3 * UM),
+                         (-2 * UM, 3 * UM)])
+        cut(c, k, "co", -d - a, 1200 + d)
+        cases.append((expect, "corner", c))
     return cases
 
 
